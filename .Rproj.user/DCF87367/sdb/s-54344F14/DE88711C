@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1510578992615.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "DE88711C",
+    "lastKnownWriteTime" : 8389754659302220320,
+    "last_content_update" : 1510578992615,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "D470F979",
+        "caption" : "lf.ts.an.prov.freq",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=lf.ts.an.prov.freq&cache_key=D470F979",
+        "displayedObservations" : 952,
+        "environment" : "",
+        "object" : "lf.ts.an.prov.freq",
+        "preview" : 0,
+        "totalObservations" : 952,
+        "variables" : 4
+    },
+    "relative_order" : 15,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

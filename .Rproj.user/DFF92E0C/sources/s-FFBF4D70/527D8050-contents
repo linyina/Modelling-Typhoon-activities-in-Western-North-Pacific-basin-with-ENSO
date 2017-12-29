@@ -1,0 +1,10 @@
+BST.glm.superty.3a <- glm(SuperTY.freq ~ sst.lag.7 + dummy.p1 + dummy.p2, data=BST.ana[8:420,],family=poisson(link = log))
+summary(BST.glm.superty.3a)   
+summary(BST.glm.superty.1)
+summary(BST.glm.superty.3)
+
+
+BST.glm.ts.3b <- glm(TS.freq ~ sst.lag.1 + dummy.p1 + dummy.p2, data=BST.ana,family=poisson(link = log))
+summary(BST.glm.ts.3b)
+summary(BST.glm.ts.1)
+summary(BST.glm.ts.3)

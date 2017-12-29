@@ -1,0 +1,13 @@
+x.new <- data.frame(sst.lag.7 = 28, dummy.p1 = -8.660254e-01
+                   , dummy.p2 = 5.000000e-01)
+pred.interval <- predict (BST.glm.ts.3, x.new,
+                          interval="prediction",level=.95)
+pred.interval
+exp(pred.interval)
+
+pred<-exp(rpois())
+hist(log(pred)) # histogram on log scale
+mean(pred)
+median(pred) # better measure
+quantile(pred,c(0.25,0.75)) # 50% interval
+quantile(pred, c(0.025, 0.975)) # 95% interval

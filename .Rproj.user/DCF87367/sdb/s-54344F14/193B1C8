@@ -1,0 +1,21 @@
+{
+    "collab_server" : "",
+    "contents" : "# the distribution of monthly BST\n\nplot(density(BST.an.mon.freq$freq))\nplot(BST.an.mon.freq$Month,BST.an.mon.freq$freq)\n",
+    "created" : 1510016901870.000,
+    "dirty" : true,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "1417971925",
+    "id" : "193B1C8",
+    "lastKnownWriteTime" : 1510016899,
+    "last_content_update" : 1510085240595,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "tempName" : "Untitled2"
+    },
+    "relative_order" : 11,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

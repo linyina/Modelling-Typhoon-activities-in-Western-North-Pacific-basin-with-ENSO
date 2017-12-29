@@ -1,0 +1,788 @@
+#######################################################################
+#
+# R script containing utility routines to accompany the book
+#
+# R.E. Chandler and E.M. Scott: Statistical Methods for 
+#  Trend Detection and Analysis in the Environmental Sciences.
+#  Wiley, Chichester, 2011. 
+#
+# The routines in this script are as follows:
+#
+# 	cook.plot   	Produce a plot of Cook's distances in a 
+#				GLM, with the threshold of 8/(n-2p) indicated.
+# 	filter.design	Design a low- or high-pass linear filter using
+#				least squares
+# 	filter.gain		Calculates squared gain for a linear filter
+#	fracdiff.acf	Exact calculatio of theoretical ACF of a 
+#				stationary ARIMA(0,d,0) process 
+#	fracdiff.decomp 	Innovations algorithm for a stationary 
+# 				ARIMA(0,d,0) process.
+#	fracdiff.negll 	Calculates the negative log-likelihood 
+#				for a stationary ARIMA(0,d,0) process with 
+#				unknown mean and variance
+#	fracdiff.slowfit	(Slow) exact maximum likelihood fitting 
+#				of a stationary ARIMA(0,d,0) model
+#	innov.decomp	Decomposes a series y into a series of 
+#				1-step-ahead predictions and associated 
+#				innovations corresponding to the 
+#				autocovariance function of a
+#				stationary process
+# 	lever.plot        Produce a plot of leverages in a GLM, with the 
+#                       threshold of 2p/n indicated
+# 	linear.fil		Apply a linear filter to a time series. This
+#				differs from the filter() function in R, in 
+#				that it allows a variety of approaches for
+#				dealing with end effects.
+#	make.SSinits	Initialises a time-invariant state space model
+# 	polyfil		Find the weights for a symmetric filter
+#				of given length corresponding to local
+#				polynomial fitting (for regularly-spaced 
+#				series)
+#	summary.dlmMLE	Produces a summary table for a dynamic linear
+#				model fitted using the dlmMLE routine in the 
+#				dlm library
+#	which.diffuse	Identifies the diffuse elements of the state 
+#				vector in a time-invariant state space model
+#	write.banner	Writes a banner to screen to show progress 
+#				in the other demo scripts 
+# 
+# The header section for each routine gives full details.  
+#
+# FILES REQUIRED:
+# ---------------
+#
+# The script requires the following files to be present:
+#
+# 	None
+#
+# LIBRARIES REQUIRED
+# ------------------
+# The following add-on R libraries are required for one or more of the 
+# routines in this script:
+#
+#	dlm
+#
+#######################################################################
+#######################################################################
+#######################################################################
+
+cook.plot <- function(model,x=NULL,n.id=NULL,lab.id=NULL,cex.id=1,
+                      xlab="Observation number",
+                      ylab="Cook's distance",ylim=NULL,...) {
+##########################################################################
+#
+# To produce a plot of Cook's distances in a (G)LM. Such a plot is 
+# produced by the plot() command applied to an object of class (g)lm, 
+# but it's difficult to customise this to show, for example, 
+# thresholds above which things should cause concern. 
+#
+# Arguments:
+#
+# model	Any object for which the function 
+#		cooks.distance() produces meaningful 
+#		results, for example an object of class lm.
+# x		Values to use for the x axis. Defaults
+#		to the observation numbers.
+# n.id	Number of individual observations to identify with 
+#		labels on the plots. The default is to label just 
+#		those points falling above the "warning" threshold.
+# lab.id	Labels used to identify individual observations if 
+#		n.id>0. Defaults to x.
+# cex.id	Character expansion to use for labels if n.id>0.
+# xlab, }   Axis labels
+# ylab  }
+# ylim	Limits for y axis. Default is to ensure that both 
+#		the individual Cook's distances and the threshold 
+#		are visible.
+# ...		Other arguments to plot.default()
+#
+##########################################################################
+ cook <- cooks.distance(model)
+ n <- length(model$fitted.values); k <- length(coef(model))
+ cook.thresh <- 8/(n-(2*k))
+ if (is.null(x)) x <- 1:n
+ if (is.null(ylim)) ylim <- c(0,max(c(1.1*cook,cook.thresh)))
+ if (is.null(n.id)) n.id <- sum(cook > cook.thresh)
+ plot(x,cook,type="h",xlab=xlab,ylab=ylab,ylim=ylim,...)
+ abline(cook.thresh,0,lty=2,col=grey(0.4))
+ if (n.id > 0) {
+  if (is.null(lab.id)) text.labs <- x else text.labs <- lab.id 
+  largest <- order(cook,decreasing=TRUE)[1:n.id]
+  text(x[largest],cook[largest],text.labs[largest],cex=cex.id,pos=3)
+ }
+}
+######################################################################
+######################################################################
+#######################################################################
+
+filter.design <- function(k,freq,pass="low") {
+##########################################################################
+#
+# To calculate weights for a least squares filter (Percival & Walden 
+# 1993, Section 5.8). Arguments:
+# 
+# k 		Length of filter (it will run from -k to k)
+# freq	Cutoff frequency, in cycles per unit time. The aim is 
+#       	to lose all frequencies on one side of this, and retain 
+#       	all the others unchanged.
+# pass  	Either "low" or "high", depending on whether a low- or 
+#       	high-pass filter is required. Default is "low"
+#
+# Value: a vector of weights
+#
+##########################################################################
+  if(!is.element(pass,c("low","high"))) {
+    stop("pass must be either 'low' or 'high'")
+  }
+  if(freq <= 0 | freq >= 0.5) stop("freq must be between 0 and 0.5")
+  lags <- (-k):k
+  nlags <- (2*k) + 1
+  z <- sin(2*pi*freq*lags)
+  z[-(k+1)] <- z[-(k+1)] / (pi*lags[-(k+1)])
+  z[k+1] <- 2*freq
+  z <- z / sum(z)
+  if (pass == "high") {
+   z[-(k+1)] <- -z[-(k+1)]
+   z[k+1] <- 1 - z[k+1]
+  }
+  z
+}
+######################################################################
+######################################################################
+#######################################################################
+
+filter.gain <- function(filter.weights,filter.lag=NULL,
+			delta=1,nfreqs=100) {
+##########################################################################
+#
+# To calculate squared gain function of a filter - see Priestley, 
+# 1981, p.268). Arguments:
+#
+# filter.weights	The filter weights
+# filter.lag	The time lags associated with each of the 
+#			weights. If there is an odd number of
+#			weights (2k+1, say), this defaults to
+#			((-k):k)/delta
+# delta		The principal time unit - controls the 
+#			Nyquist frequency
+# nfreqs		Number of frequencies at which to evaluate
+#			the gain, between zero and the Nyquist
+#			frequency
+#
+# Value: a matrix with three columns. The first contains 
+#        frequencies in units of "cycles per unit time". The
+#        second contains frequencies in radians. The third
+#        contains the squared gains 
+#
+##########################################################################
+  if (is.null(filter.lag)) {
+    k <- (length(filter.weights)-1)/2   # Test for odd filter
+    if (abs(k-round(k)) < 1e-6) {	# length
+      filter.lag <- ((-k):k) / delta
+    } else {
+      stop("no default lags defined for even length filters")
+    }
+  }
+  freq.unittime <- (0:nfreqs)/(2*nfreqs*delta)
+  w <- 2*pi*freq.unittime
+  z <- rep(0,nfreqs+1)
+  for (p in (1:length(w))) {
+    G1 <- sum(filter.weights*cos(w[p]*filter.lag))
+    G2 <- sum(filter.weights*sin(w[p]*filter.lag))
+    z[p] <- G1^2 + G2^2
+  }
+  invisible(cbind(freq.unittime,w,z))
+}
+######################################################################
+######################################################################
+######################################################################
+
+fracdiff.acf <- function(d,lag.max,type="correlation") {
+######################################################################
+#
+# 	Computes the theoretical autocorrelation (if type="correlation")
+# 	or autocovariance (if type="covariance") function of a stationary 
+# 	ARIMA(0,d,0) process from lags 0 to lag.max, returning the result 
+# 	as a vector. Expressions are taken from Hosking (Biometrika, 1981)
+# 	and have been checked against the results of ckARMA0 in Beran's
+# 	longmemo package. Hopefully this routine is cheaper and more accurate 
+# 	than ckARMA0, because it uses only one call to the gamma function and 
+# 	does the arithmetic in such a way as to avoid over/underflows.
+#
+######################################################################
+ if (abs(2*d) >= 1) stop("d must be in the open interval (-1/2,1/2)")
+ z <- cumprod(c(1,(d:(d+lag.max-1)) / (-d+(1:lag.max))))
+ if (type == "covariance") {
+  z <- z*gamma(1-(2*d)) / (gamma(1-d)^2)
+ } else if (type != "correlation") {
+  warning(paste("type must be either 'correlation' or 'covariance'",
+                "- correlations returned"))
+ }
+ z 
+}
+######################################################################
+######################################################################
+#######################################################################
+
+fracdiff.decomp <- function(y,d,sigma=1,n.ahead=0) {
+######################################################################
+#
+# 	Decomposes a vector y into one-step ahead predictions and innovations,
+# 	under the assumption that it is generated from a stationary 
+# 	ARIMA(0,d,0) process with error standard deviation sigma. The result 
+# 	is returned as a data frame with four columns: "Obs", "Predict", 
+# 	"Innov" and "Var.innov". This is just a wrapper for innov.decomp, 
+# 	and can also be used to produce forecasts and error variances for
+# 	the next n.ahead values of the process.
+#
+######################################################################
+ if (abs(2*d) >= 1) stop("d must be in the open interval (-1/2,1/2)")
+ n <- length(y)
+ theor.covs <- sigma^2*fracdiff.acf(d=d,lag.max=n+n.ahead-1,type="covariance")
+ innov.decomp(y,theor.covs)
+}
+######################################################################
+######################################################################
+######################################################################
+
+fracdiff.negll <- function(theta,y,mu=NULL,sigma=NULL,d=NULL) {
+######################################################################
+#
+# 	Calculates the negative log-likelihood, conditioned on a data
+# 	vector y, for a stationary ARIMA(0,d,0) process with mean mu
+# 	and error standard deviation sigma (stationarity is enforced 
+# 	by setting the negative log-likelihood to infinity if d is 
+# 	outside the stationary region). The parameter values are taken 
+# 	from the arguments mu, sigma and d if these are given; otherwise
+# 	they are taken from theta, which contains values for the remaining
+# 	parameters in the order mu,sigma,d (so if the argument mu is given, 
+# 	theta contains (sigma,d)). This is to enable optimisation 
+# 	using nlm() with one or more parameters fixed. 
+#
+######################################################################
+ fixed <- c(!is.null(mu),!is.null(sigma),!is.null(d))
+ if (sum(fixed)+length(theta) != 3) {
+  stop("specify each parameter exactly once")
+ }
+ theta.idx <- 1
+ if (!is.null(mu)) {
+  mm <- mu
+ } else {
+  mm <- theta[theta.idx]; theta.idx <- theta.idx+1
+ }
+ if (!is.null(sigma)) {
+  ss <- sigma
+ } else {
+  ss <- theta[theta.idx]; theta.idx <- theta.idx+1
+ }
+ if (!is.null(d)) {
+  dd <- d
+ } else {
+  dd <- theta[theta.idx]
+ }
+ if (abs(2*dd) >= 1) return(.Machine$double.xmax)
+ decomp <- fracdiff.decomp(y-mm,dd)
+ -sum(dnorm(decomp$Innov,sd=ss,log=TRUE))
+}
+######################################################################
+######################################################################
+######################################################################
+
+fracdiff.slowfit <- function(y,mu=NULL,sigma=NULL,d=NULL) {
+######################################################################
+#
+# 	(Slow) exact maximum likelihood fitting of a stationary
+# 	ARIMA(0,d,0) model to data held in a vector y. This estimates
+# 	the mean, error standard deviation and differencing 
+# 	parameter (and hence can be used as an alternative to fracdiff
+# 	if these other parameters are required). If any of the arguments
+# 	mu, sigma or d are given, these are taken as fixed in the
+# 	optimisation.
+#
+######################################################################
+ theta.start <- c(mean(y),sd(y),0)
+ fixed <- c(!is.null(mu),!is.null(sigma),!is.null(d))
+ theta.start <- theta.start[!fixed]
+ z <- nlm(fracdiff.negll,p=theta.start,y=y,mu=mu,sigma=sigma,d=d,hessian=TRUE)
+ CovMat <- solve(z$hessian)
+ StdErr <- sqrt(diag(CovMat))
+ res.table <- data.frame(Estimate=z$estimate,StdErr=StdErr)
+ rownames(res.table) <- c("Mu","Sigma","d")[!fixed]
+ list(Fit=res.table,LogL=-z$minimum,AIC=2*(z$minimum+sum(!fixed)),
+      Cov=CovMat,conv=z$code)
+}
+######################################################################
+######################################################################
+######################################################################
+
+innov.decomp <- function(y,covs) {
+######################################################################
+#
+# 	Decomposes a series y into a series of 1-step-ahead predictions
+# 	and associated innovations, based on the assumption that it was
+# 	generated by a stationary zero-mean process with autocovariance 
+#	function held in the vector covs (no attempt is made to check 
+#	that this is positive definite). The result is returned as a 
+#	data frame with four columns "Obs", "Predict","Innov" and 
+#	"Var.innov". The number of rows of the result is equal to 
+#	length(covs); if this is greater than length(y) then the extra 
+#	rows correspond to forecasts; the corresponding elements of 
+#	Innov are set to zero, and the corresponding elements of 
+#	Var.innov are the forecast error variances.
+#
+# 	Note that the internal storage for this routine is O(n^2) where
+# 	n=length(covs); hence it is probably not suitable for use with 
+# 	really long series.
+#
+######################################################################
+ if (length(covs) < length(y)) stop("covs must be at least as long as y")
+ nmax <- length(covs); ny <- length(y)
+ z <- data.frame(matrix(nrow=nmax,ncol=4))
+ names(z) <- c("Obs","Predict","Innov","Var.innov")
+ z[1:ny,1] <- y
+ w <- matrix(0,nrow=nmax,ncol=nmax)
+ v <- rep(NA,nmax); v[1] <- covs[1]
+ z[1,] <- c(y[1],0,y[1],v[1])
+ for (row.idx in 2:nmax) {
+  n <- row.idx-1
+  for (col.idx in 1:n) {
+   k <- n-(row.idx-col.idx)
+   tmp <- 0
+   if (k > 0) {
+    j <- 0:(k-1)
+    tmp <- sum(v[j+1]*w[k+1,j+1]*w[n+1,j+1])
+   }
+   w[row.idx,col.idx] <- ( covs[n-k+1] - tmp ) / v[k+1]
+  }
+  j <- 0:(n-1)
+  v[row.idx] <- covs[1] - sum(v[j+1]*w[row.idx,j+1]^2)
+  z$Predict[row.idx] <- sum(w[row.idx,1:n]*z$Innov[1:n])
+  if (row.idx <= ny) {
+   z$Innov[row.idx] <- y[row.idx] - z$Predict[row.idx]
+   z$Var.innov[row.idx] <- v[row.idx]
+  } else {
+   z$Innov[row.idx] <- 0
+   j <- 1:ny
+   z$Var.innov[row.idx] <- covs[1]-sum(v[1+ny-j]*w[row.idx,ny-j+1]^2)
+  }
+ }
+ z
+}
+######################################################################
+######################################################################
+#######################################################################
+
+lever.plot <- function(model,x=NULL,n.id=NULL,lab.id=NULL,cex.id=1,
+                      xlab="Observation number",
+                      ylab="Leverage",ylim=NULL,...) {
+##########################################################################
+#
+# To produce a plot of leverages in a (G)LM. Such a plot is 
+# produced by the plot() command applied to an object of class (g)lm, 
+# but it's difficult to customise this to show, for example, 
+# thresholds above which things should cause concern. 
+# Arguments are exactly the same as for routine cook.plot() in file
+# trendutils.r.
+#
+##########################################################################
+ lever <- hatvalues(model)
+ n <- length(model$fitted.values); k <- length(coef(model))
+ lever.thresh <- 2*k/n
+ if (is.null(x)) x <- 1:n
+ if (is.null(ylim)) ylim <- c(0,max(c(1.1*lever,lever.thresh)))
+ if (is.null(n.id)) n.id <- sum(lever > lever.thresh)
+ plot(x,lever,type="h",xlab=xlab,ylab=ylab,ylim=ylim,...)
+ abline(lever.thresh,0,lty=2,col=grey(0.4))
+ if (n.id > 0) {
+  if (is.null(lab.id)) text.labs <- x else text.labs <- lab.id 
+  largest <- order(lever,decreasing=TRUE)[1:n.id]
+  text(x[largest],lever[largest],text.labs[largest],cex=cex.id,pos=3)
+ }
+}
+######################################################################
+######################################################################
+#######################################################################
+
+linear.fil <- function(x,method="ma",w,k,d,ends="none",n.append=1) {
+##########################################################################
+#
+# To apply a linear filter to a time series, with a variety of 
+# possible options for dealing with end effects. Arguments:
+# 
+# x		The series to be filtered
+# method	Either "ma" (for a moving average filter)
+#		or "poly" (for a filter based on local
+#		polynomial fitting). Mathematically, "poly"
+#		is just a special case of "ma"; if the 
+#		argument here is "poly", the function will
+#		automatically determine the correct smoothing
+#		weights
+# w		If method = "ma", a vector of weights to be
+#		used in the smoothing. The length of this
+#		should be an odd number - say 2k+1. In this
+#		case, the filtered series will be defined as
+#
+#			y[t] = sum_{j=-k}^{k} w[j+k+1] x[t+j]
+#
+#		except at the ends (see the "ends" argument
+#		below). This is identical to the "filter" 
+#		argument to the filter() command, when the
+#		"convolution" method is used.
+# k, d	If method = "poly", the filtered values will
+#		be taken as the fitted values from polynomials
+#		of degree d fitted to groups of (2k+1) 
+#		observations (again, except at the ends).
+# ends	Controls the treatment of end effects. Options:
+#
+#		"none"	   Don't make any adjustment at the ends.
+#				   In this case, for a filter of length 
+#				   2k+1, the first and last k values of
+#				   the filtered series will be missing.
+#				   This is the default.
+#		"circular" 	   Wrap the observations around at each
+#				   end of the series so as to enable
+#				   computation of filtered values at 
+#				   all time points. This is equivalent
+#				   to the "circular" option in the 
+#				   filter() command (which it uses).
+#		"reweight"     At the ends of the series, calculate
+#				   a weighted average of just those 
+#				   observations that *are* available.
+#				   NB this is only permitted for low-pass
+#				   filters (i.e. those for which the
+#				   full set of weights sums to 1), 
+#				   since otherwise it doesn't make
+#				   sense to renormalise the weights
+#		"refit"	   If method = "poly", fit polynomials
+#				   at the end of the series just to the
+#				   available observations; take fitted
+#				   values as usual.
+#		"append"       Append extra observations to the 
+#				   beginning and end of the series to 
+#				   enable computation of filtered 
+#				   values throughout. See n.append
+#				   below.
+# n.append	If ends = "append", n.append data points will be 
+#		taken from the beginning and end of the series, 
+#		and replicated often enough to make up the required
+#		number of observations for the filter. If n.append=1
+#		(the default) and the filter is of length 2k+1, the 
+#		first observation will be copied k times at the 
+#		beginning of the series and the last observation will
+#		be copied k times at the end. If n.append=12, the 
+#		first 12 and last 12 observations will be replicated
+#		similarly, as often as required. 
+#
+# Value: a vector containing the filtered series
+#
+##########################################################################
+  if (method == "ma") {					     # Check that
+   if (missing(w)) stop("w must be supplied for ma method")  # inputs are
+   if (!missing(k) || !missing(d)) {			     # consistent
+     warning("Arguments k and d not used in ma method")      # with each
+   } 						             # other
+   ww <- w
+   nw <- length(ww)
+  } else if (method == "poly") {
+   if (missing(k) || missing(d)) {			 
+     stop("Arguments k and d must be supplied for poly method")
+   }
+   if (!missing(w)) warning("Argument w not used in poly method")
+   ww <- polyfil(k,d,ends=="refit")
+   nw <- (2*k) + 1
+  } else {
+   stop("method must be either ma or poly")
+  }
+  n <- length(x)
+  if (ends == "none") {			 		     # Here's the
+   z <- filter(x,ww)					     # filtering
+  } else if (ends == "circular") {               
+   z <- filter(x,ww,circular=TRUE)                 
+  } else if (ends == "append") {                
+   kk <- floor(nw/2)                  
+   nrep <- 1+floor(kk/n.append); n.extra <- (nrep*n.append) - kk
+   xx <- c(rep(x[1:n.append],nrep),x,rep(x[(n-n.append+1):n],nrep))
+   xx <- xx[(n.extra+1):(length(xx)-n.extra)]
+   z <- filter(xx,ww)
+   z <- z[!is.na(z)]
+  } else if (ends == "reweight") {
+   if (!isTRUE(all.equal(sum(ww),1))) {
+    stop("Option reweight can only be used with weights that sum to 1")
+   }
+   z <- filter(x,ww)
+   kk <- floor(nw/2)
+   for (j in 1:kk) {
+    z[j] <- weighted.mean(x[1:(j+kk)],ww[(kk+2-j):nw])
+    z[n+1-j] <- weighted.mean(x[(n+1-j-kk):n],ww[1:(kk+j)])
+   }
+  } else if (ends == "refit") {				    # For 
+   if (method != "poly") {				    # polynomial
+    stop("ends=refit can only be used with method=poly")    # refitting,
+   }							    # ww is a
+   z <- filter(x,ww[k+1,])				    # matrix
+   for (j in 1:k) {
+    z[j] <- sum(ww[j,(k+2-j):nw]*x[1:(k+j)])
+    z[n+1-j] <- sum(ww[nw+1-j,1:(j+k)]*x[(n+1-k-j):n])
+   }
+  } else {
+   stop(paste("Invalid choice (",ends,") of ends argument",sep=""))
+  } 
+  z
+}
+######################################################################
+######################################################################
+#######################################################################
+
+make.SSinits <- function(GG,W,kappa) {
+######################################################################
+#
+# Initialises a time-invariant state space model with transition 
+# matrix GG and innovation covariance matrix W. Stationary elements 
+# of the state vector are initialised with the stationary mean 
+# which is zero; nonstationary elements are also initialised with 
+# zero. The corresponding covariance matrices are initialised with 
+# the stationary covariance matrix (for the stationary parts) and 
+# kappa times the identity matrix for the nonstationary part. 
+# The covariance matrix for the stationary part is calculated 
+# according to equation (3.3.21) of Harvey (1989). 
+#
+# Value: a list containing components m0 and C0: m0 is the estimate
+# of the state vector prior to seeing any data and P0 is the associated 
+# error covariance matrix.
+#
+######################################################################
+ if (!is.matrix(GG)) stop("GG should be a matrix")
+ if (!is.matrix(W)) stop("W should be a matrix")
+ p <- nrow(GG)
+ if (ncol(GG) != p) stop("GG should be a square matrix")
+ if (ncol(W) != p | nrow(W) != p) stop("W should be the same size as GG")
+ 
+ m0 <- matrix(rep(0,p),ncol=1)
+ C0 <- matrix(0,nrow=p,ncol=p)
+ diff.els <- which.diffuse(GG)
+ diag(C0)[diff.els] <- kappa
+ p <- sum(!diff.els)
+ if (p>0) {
+  GG.stat <- GG[!diff.els,!diff.els,drop=FALSE]
+  W.stat <- W[!diff.els,!diff.els,drop=FALSE]
+  GG.GG <- GG.stat %x% GG.stat
+  II <- diag(rep(1,p*p))
+  Cvec <- solve(II-GG.GG,as.vector(W.stat))
+  C0[!diff.els,!diff.els] <- Cvec
+ }
+ list(m0=m0,C0=(C0+t(C0))/2)	# Ensure C0 is symmetric
+}
+######################################################################
+######################################################################
+#######################################################################
+
+polyfil <- function(k,d,ends=FALSE) {
+##########################################################################
+#
+# To calculate weights for a filter obtained by fitting polynomials
+# of to successive groups of observations. Arguments:
+#
+# k		Controls the filter length, which will be 2k+1
+# d		The degree of the polynomials to fit (must be greater 
+#		than 2k)
+# ends	Controls whether or not to return modified weights for
+#		use at the ends of a series. Default FALSE.
+#
+# The function works by writing the polynomial fitting as a linear 
+# model: set up a design matrix X, whose columns are orthonormal 
+# polynomials over the range (-k,k). If we want to fit these 
+# polynomials to some data, y say, the least squares coefficients 
+# are [(X'X)^-1] X'y = X'y, since X is orthonormal. Hence the 
+# fitted values are XX'y. We want the weights corresponding to 
+# the (k+1)th fitted value i.e. the (k+1)th row of X'X. At the
+# ends of the series, suppose we're filtering at time point 
+# t < k+1. Then (k+1-t) data points will be lost at the beginning
+# of the filter; the fitting values from the remaining regression
+# are, say, [X0]' {([X0]'[X0])^-1} [X0]'[y0], where X0 and y0 
+# contain just the remaining rows the rows of X and y. But 
+# [X0]'[X0] = X'X - [X1]'[X1] = I - [X1]'[X1], where X1 contains 
+# the *deleted* rows. Moving from row i-1 to row i, this matrix
+# can be updated by subtracting [xi][xi]', where xi is row i
+# of X. The *inverse* can be obtained from the old inverse using
+# the Sherman-Morrison formula (Press et al. 1992, pp.65-66), 
+# which yields the result in O(d^2) operations instead of 
+# O(d^3) - in fact, it's never necessary to compute or store the
+# matrix [X0]'[X0] at all, since we can always work with its
+# inverse (which starts at the identity). Probably unnecessarily
+# clever, but irresistible ...
+#
+# Value: 	if ends=FALSE, a vector of weights. If ends=TRUE,
+#        	a (2k+1)*(2k+1) matrix: rows 1 to k contain the
+#        	weights to be used for the first k observations in  
+#	 	the series, rows k+2 to 2k+1 contain the weights
+#	 	for the last k observations, and row k+1 contains
+#	 	the weights for all the remaining observations. The 
+#	 	matrix contains NAs in the top left- and bottom 
+#	 	right-hand corners - these correspond to the 
+#	 	observations that will be missing for each row
+##########################################################################
+  lags <- (-k):k
+  nlags <- (2*k) + 1
+  if (nlags < d+1) stop("Degree of polynomial exceeds no. of observations") 
+  X <- cbind(rep(1,nlags)/sqrt(nlags),    # Orthogonal polynomial
+	     poly(lags,degree=d))           # design matrix
+  if (!ends) {
+   z <- as.vector((X[k+1,]%*%t(X)))
+  } else {
+   z <- matrix(nrow=nlags,ncol=nlags)
+   z[k+1,] <- X[k+1,]%*%t(X)
+   X0X0inv <- diag(rep(1,d+1))            # Weights for first k
+   for (i in 1:k) {                       # observations (NB
+    xi <- t(X[i,,drop=FALSE])             # weights for last k
+    Sx <- t(X0X0inv %*% xi)               # are the same but in
+    lambda <- -sum(xi*t(Sx))              # reverse order)
+    X0X0inv <- X0X0inv + ( crossprod(Sx,Sx) / (1+lambda) )
+    z[k+1-i,((i+1):nlags)] <- X[k+1,] %*% X0X0inv %*% t(X[-(1:i),])
+    z[k+1+i,1:(nlags-i)] <- rev(z[k+1-i,((i+1):nlags)])
+   }
+  }
+  z
+}
+######################################################################
+######################################################################
+#######################################################################
+
+summary.dlmMLE <- function(fit,print=TRUE) {
+######################################################################
+#
+# Produce a summary table of a dlm fit obtained using dlmMLE.
+# Arguments:
+#
+# fit		The result of a call to dlmMLE
+# print	If TRUE, results are written to screen
+#
+# Value: a list containing the following components:
+#
+# model.table	Table of estimates and, if fit contains a
+#			"hessian" component (the result of calling
+#			dlmMLE with argument hessian=TRUE) 
+#			approximate standard errors
+# logLik		The log-likelihood for the fit
+# Corr		If fit contains a "hessian" component,
+#			approximate correlation matrix of the
+#			parameter estimates. 
+#
+######################################################################
+ have.hess <- "hessian" %in% names(fit)
+ if (have.hess) {
+  covmat <- solve(fit$hessian)
+  Std.Errs <- sqrt(diag(covmat))
+  cormat <- cov2cor(covmat)
+ } else {
+  Std.Errs <- cormat <- NULL
+ }
+ model.table <- rbind(fit$par,Std.Errs)
+ rownames(model.table) <- if (have.hess) c("Estimate","SE") else "Estimate"
+ logLik <- -fit$value
+ if (print) {
+  cat("Parameter estimates:\n\n")
+  print(round(model.table,4))
+  if (have.hess) {
+   cat("\nCorrelation matrix of parameter estimates:\n\n")
+   print(round(cormat,3))
+  }
+  cat(paste("\nLog-likelihood:",round(logLik,2),"\n\n"))
+ }
+ invisible(list(model.table=model.table,Corr=cormat,logLik=logLik))
+}
+######################################################################
+######################################################################
+#######################################################################
+
+which.diffuse <- function(GG) {
+######################################################################
+#
+# Takes the transition matrix GG of a state space model and identifies
+# which elements of the state vector are nonstationary. No checking is
+# done; this is designed to be called from other functions.
+#
+# Value: a logical vector that is TRUE for the nonstationary components
+#        of the state vector and FALSE for the stationary components.
+#
+######################################################################
+ p <- nrow(GG)
+ dep.marks <- (GG!=0)
+ n.depend <- rowSums(dep.marks)
+ no.self.depend <- 1-diag(dep.marks) 
+#
+# The next line creates an ordering of the state elements, 
+# sorted firstly by whether or not they depend directly on
+# their own previous values, and within that by the number
+# of dependencies. Thus we start by checking those elements
+# of the state vector that only depend on their own 
+# previous values, which is easy; as we discover nonstationary
+# components, we can then look to see which other components
+# depend on them because these must also be nonstationary. 
+# As we go through, whenever we get to a component that hasn't
+# been marked as nonstationary we need to check whether the 
+# subsystem upon which it depends is stationary; if all else
+# fails, this is done by examining the largest eigenvalue of
+# that subsystem. Hopefully however, the reordering will 
+# reduce the number of required eigendecompositions to the 
+# bare minimum. 
+#
+ state.code <- (p*no.self.depend)+n.depend
+ direct.dep <- state.code == 1
+ state.order <- order(state.code)
+ z <- rep(FALSE,p); checked <- z
+ for (s in (1:p)[direct.dep[state.order]]) {
+  z[s] <- abs(diag(GG)[s]) >= 1
+  checked[s] <- TRUE
+  if (z[s]) {
+   z[dep.marks[,s]] <- TRUE
+   checked[dep.marks[,s]] <- TRUE
+  }
+ }
+ for (s in (1:p)[!direct.dep[state.order]]) {
+  if (!checked[s]) {
+   subsys.deps <- dep.marks[s,]
+   subsys.deps[s] <- TRUE
+   subsys.mat <- GG[subsys.deps,subsys.deps]
+   lambda <- max(abs(eigen(subsys.mat,symmetric=FALSE,only.values=TRUE)$values))
+   z[s] <- lambda >= 1
+  }
+  checked[s] <- TRUE
+  if (z[s]) {
+   z[dep.marks[,s]] <- TRUE
+   checked[dep.marks[,s]] <- TRUE
+  }
+ }
+ z
+}
+######################################################################
+######################################################################
+#######################################################################
+
+write.banner <- function(text,width=72) {
+#######################################################################
+#
+#	Writes a banner to screen to show progress in the other demo 
+#	scripts. Arguments:
+#
+#	text		A character scalar giving the text to be written
+#	width		The output device width in columns
+#
+#	The function merely formats the text and prints a centred
+#	version to the output device. 
+#
+#######################################################################
+ textlen <- nchar(text)
+ if (textlen > width-10) stop("text is too long for specified device width")
+ startpos <- floor(width-10-textlen) / 2
+ cat("\n"); cat(paste(rep(" ",startpos-1),collapse=""))
+ cat(paste(rep("#",textlen+10),collapse="")); cat("\n")
+ cat(paste(rep(" ",startpos-1),collapse="")); cat("#    ")
+ cat(text); cat("    #\n")
+ cat(paste(rep(" ",startpos-1),collapse=""))
+ cat(paste(rep("#",textlen+10),collapse="")); cat("\n\n")
+ cat("Press a key to carry out the analysis ...\n")
+ readLines(n=1)
+ NULL
+}
+
+

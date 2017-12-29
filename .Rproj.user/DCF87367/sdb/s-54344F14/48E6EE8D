@@ -1,0 +1,21 @@
+{
+    "collab_server" : "",
+    "contents" : "## Construct Data for analysis\n\n\nBST.mon.data<- data.frame(Year = BST.an.mon.freq$Year,\n                          Month = BST.an.mon.freq$Month,\n                          TC.freq = BST.an.mon.freq$freq,\n                          TS.freq = BST.mon.TS$freq,\n                          TY.freq = BST.mon.TY$freq,\n                          SuperTY.freq = BST.mon.SuperTY$freq)\nBST.mon.data$Month<- as.numeric(as.character(BST.mon.data$Month))\n\nstr(BST.mon.data)\n\nNino<- data.frame(Year = SST$YR,\n                  Month = SST$MON,\n                  NINO3 = SST$NINO3,\n                  ANOM3 = SST$ANOM.1,\n                  NINO3.4 = SST$NINO3.4,\n                  ANOM3.4 = SST$ANOM.3,\n                  NINO4 = SST$NINO4,\n                  ANOM4 = SST$ANOM.2)\nBST.ana<- merge(BST.mon.data, Nino)\nwrite.table(BST.ana, \"BST_analysis_data.dat\", row.names = FALSE)\n\n## Plotting\n## Tropical Storm\npar(mfrow=c(2,1))\nplot(BST.ana$NINO3.4,BST.ana$TS.freq, xlab = \"Monthly SST in region NINO3.4\",\n     ylab = \"Numer of Tropical Storms +\", main = \"Original Scales\")\nplot(BST.ana$NINO3.4,BST.ana$TS.freq, xlab = \"Monthly SST in region NINO3.4\",\n     ylab = \"Numer of Tropical Storms +\", log = \"xy\",main = \"Logarithmic Scales\")\n\n\n## Building model\n## Functions\nlibrary(DAAG)#vif\nlibrary(MASS)\nlibrary(lattice)\n\nmodel.vif<-function(model){\n  Vif<-vif(model, digits=3)\n  print(Vif[Vif>=10])\n}\n\n\nChecking<- function(model,x){\n  plot(model, which=1:4)\n  cat(\"\\n Levarage:\\n\")\n  Lev(model,x)\n  cat(\"\\n DFFITS:\\n\")\n  Dff(model,x)\n  cat(\"\\n Cook's distance:\\n\")\n  Cook(model,x)\n  cat(\"\\n VIF \\n\")\n  Ref.vif(model)\n}\n\n\npar(mfrow=c(2,2))\nif (!(names(dev.cur()) %in% c(\"windows\",\"X11cairo\"))) x11(width=8,height=6)\n\n## 1. Using NINO3 + NINO4\nBST.glm.tc.1<- glm(TC.freq ~ NINO3 + NINO4,data=BST.ana,family=poisson(link = log))\nsummary(BST.glm.tc.1)\nChecking(BST.glm.tc.1)\nBST.glm.ts.1<- glm(TS.freq ~ NINO3 + NINO4,data=BST.ana,family=poisson(link = log))\nsummary(BST.glm.ts.1)\nChecking(BST.glm.ts.1)\nBST.glm.ty.1<- glm(TY.freq ~ NINO3 + NINO4,data=BST.ana,family=poisson(link = log))\nsummary(BST.glm.ty.1)\nBST.glm.superty.1<- glm(SuperTY.freq ~ NINO3 + NINO4,data=BST.ana,family=poisson(link = log))\nsummary(BST.glm.superty.1)\n\nBST.glm.2 <- glm(freq ~ NINO3.4, data=BST.ana, family = poisson)\nsummary(BST.glm.2)\n",
+    "created" : 1510532191297.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3673445879",
+    "id" : "48E6EE8D",
+    "lastKnownWriteTime" : 1510583383,
+    "last_content_update" : 1510583383213,
+    "path" : "E:/UCL_Study/Project_typhoon/STAT3901 Project/Step 3-2 Models preparation.R",
+    "project_path" : "Step 3-2 Models preparation.R",
+    "properties" : {
+        "tempName" : "Untitled3"
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

@@ -1,0 +1,503 @@
+#######################################################################
+#
+# R script for analysis of the haddock stocks data in 
+#
+# R.E. Chandler and E.M. Scott: Statistical Methods for 
+#  Trend Detection and Analysis in the Environmental Sciences.
+#  Wiley, Chichester, 2011. 
+#
+# This script contains code used for the following examples and 
+# figures in the book:
+#
+# 	Figure 1.2 					(page 8)
+#	Example 3.1					(page 63)
+#	Example 3.2 including Figure 3.1	(page 66)
+#	Example 3.3					(page 69)
+#	Example 3.5					(page 76)
+#	Example 3.6 including Figure 3.2	(page 78)
+#	Example 3.9 including Figure 3.5	(page 107)
+#	Example 5.2 including Figure 5.3	(page 183)
+#	Example 5.7 including Figure 5.6	(page 196)
+#	Example 5.3 including Figure 5.4	(page 189)
+#
+# Note that Example 5.7 is done before Example 5.3.
+#
+# FILES REQUIRED:
+# ---------------
+#
+# The script requires the following files to be present in the 
+# current directory:
+#
+#	haddock.dat
+#	trendutils.r 
+#
+# LIBRARIES REQUIRED
+# ------------------
+# The script requires the following add-on R libraries to be installed:
+#
+#	lmtest
+#
+#######################################################################
+#######################################################################
+#######################################################################
+
+#######################################################################
+#
+# 	DEFINE UTILITY FUNCTIONS AND LOAD REQUIRED LIBRARIES
+#
+#######################################################################
+source("trendutils.r")
+require(lmtest)
+
+#######################################################################
+#
+# 	FIGURE 1.2 (PAGE 8)
+#
+#######################################################################
+write.banner("FIGURE 1.2 (PAGE 8)")
+#
+#	Read data from file and create a copy containing only 
+#	values until 2000
+#
+haddock.all <- read.table("haddock.dat",header=T)
+haddock.data <- haddock.all[haddock.all$Year <= 2000,]
+#
+#	Open graphics window of specified size and set plot margins 
+#
+x11(width=11,height=8)
+par(mfrow=c(2,2),cex=1.2,mar=c(4,4,3,2))
+#
+#	Plot (a)
+#
+plot(haddock.data$Year,haddock.data$Biomass,type="l",lwd=3,
+     xlab="Year",ylab="Thousands of tonnes",log="y",
+     ylim=c(10,1000), main="(a)")
+#
+#	Plot (b) requires differences of log biomass data
+#
+haddock.diff <- diff(log(haddock.data$Biomass))
+plot(haddock.data$Year[-1],exp(haddock.diff),type="l",lwd=3,
+     xlab="Year",log="y",ylab="Ratio",main="(b)")
+#
+#	Plots (c) and (d) require models to be fitted, along
+#	with prediction intervals for the next 10 years. It's 
+#	helpful to attach the data frame here so that the columns 
+#	can be referenced by name. For plot (c) we want a linear 
+#	regression model for the log data, with AR(2) residuals. 
+#
+attach(haddock.data)
+haddock.lm <- arima(log(Biomass),order=c(2,0,0),xreg=Year-1962)
+cat("SUMMARY OF LINEAR REGRESSION MODEL WITH AR(2) RESIDUALS:\n")
+print(haddock.lm)
+predyrs <- (max(haddock.data$Year)+1):2010
+lm.preds <- predict(haddock.lm,n.ahead=length(predyrs),newxreg=predyrs-1962)
+lm.ul95 <- exp(lm.preds$pred + (1.96*lm.preds$se))
+lm.ll95 <- exp(lm.preds$pred - (1.96*lm.preds$se))
+#
+#	Plot (d) requires an ARIMA(2,1,0)
+#
+haddock.arima <-  arima(log(Biomass),order=c(2,1,0))
+cat("\nSUMMARY OF ARIMA(2,1,0) MODEL:\n")
+print(haddock.arima)
+arima.preds <- predict(haddock.arima,n.ahead=length(predyrs))
+arima.ul95 <- exp(arima.preds$pred + (1.96*arima.preds$se))
+arima.ll95 <- exp(arima.preds$pred - (1.96*arima.preds$se))
+#
+# 	Here are the plots, on linear scale: last 20 years' data,
+#	plus prediction intervals for the next 10 years. Use the 
+#	same y-axis scaling on both plots. First plot (c):
+#
+ylim <- range(c(lm.ll95,arima.ll95,lm.ul95,arima.ul95,Biomass[Year >= 1980]))
+plot(Year[Year >= 1980],Biomass[Year >= 1980],type="l",lwd=3,
+     xlim=c(1980,max(predyrs)),ylim=ylim,
+     xlab="Year",ylab="Thousands of tonnes",main="(c)")
+lines(predyrs,lm.ll95,lwd=3,lty=3)
+lines(predyrs,lm.ul95,lwd=3,lty=3)
+
+legend(1980,650,c("Observations",
+                  "95% prediction intervals"),
+                  lwd=2,lty=c(1,3),text.width=18)
+#
+#	And then plot (d)
+#
+plot(Year[Year >= 1980],Biomass[Year >= 1980],type="l",lwd=3,
+     xlim=c(1980,max(predyrs)),ylim=ylim,
+     xlab="Year",ylab="Thousands of tonnes",main="(d)")
+lines(predyrs,arima.ll95,lwd=3,lty=3)
+lines(predyrs,arima.ul95,lwd=3,lty=3)
+#
+#	Uncomment the following lines to generate an appropriate 
+#	graphics output file
+#
+# dev.copy(postscript,"Fig1.2.eps",width=11,height=8,onefile=TRUE)
+# dev.off()
+# dev.copy(pdf,"Fig1.2.pdf",width=11,height=8)
+# dev.off()
+#
+#	Detach the data frame
+#
+detach(haddock.data)
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 3.1 (PAGE 63)
+#
+#######################################################################
+write.banner("EXAMPLE 3.1 (PAGE 63)")
+
+#
+# 	Define new columns "logBiomass" and "Time" so that the output 
+# 	looks nice - and close down the graphics window that was opened 
+# 	for the previous example
+#
+dev.off()
+nyears <- dim(haddock.data)[1]
+haddock.data <- cbind(haddock.data,1:nyears,log(haddock.data$Biomass))
+names(haddock.data)[3:4] <- c("Time","logBiomass")
+#
+# 	Fit a "naive" linear trend model to the log Biomass
+#
+trend.model0 <- lm(logBiomass ~ Time, data=haddock.data)
+cat("RESULTS FOR NAIVE LINEAR TREND MODEL:")
+print(summary(trend.model0))
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 3.2 (PAGE 66)
+#
+#######################################################################
+write.banner("EXAMPLE 3.2 INCLUDING FIGURE 3.1 (PAGE 66)")
+
+#
+# 	Open graphics window and set plot margins etc. 
+#
+x11(width=10,height=7)
+par(mfrow=c(2,2),mgp=c(2,0.75,0),tcl=-0.3,mar=c(3.5,4,3,2),
+    cex.lab=1.5,cex.axis=1.25,cex.main=1.5,lwd=2)
+#
+# 	Calculate residuals and produce diagnostic plots for Figure 3.1.
+# 	First plot (a):
+#
+e0 <- resid(trend.model0)
+plot(haddock.data$Year,e0,type="l",xlab="Year",ylab="Residual",
+     main="(a)")
+abline(0,0,lty=2)
+#
+# 	Now plot (b)
+#
+plot(haddock.data$Year,abs(e0),type="l",xlab="Year",
+     ylab=expression("|Residual|"),main="(b)")
+abline(mean(abs(e0)),0,lty=2)
+#
+#	Plot (c)
+#
+acf(e0,main="(c)")
+#
+#	And plot (d)
+#
+qqnorm(e0,main="(d)",pch=16)
+#
+#	Finally the Durbin-Watson test
+#
+cat("DURBIN-WATSON TEST RESULT:\n")
+cat("--------------------------\n")
+print(dwtest(trend.model0))
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 3.3 (PAGE 69)
+#
+#######################################################################
+write.banner("EXAMPLE 3.3 (PAGE 69)")
+
+trend.model1 <- lm(logBiomass ~ I(Year-2005), data=haddock.data)
+cat("RESULTS FOR NAIVE LINEAR TREND MODEL WITH ORIGIN SHIFT:\n")
+print(summary(trend.model1))
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 3.5 (PAGE 76)
+#
+#######################################################################
+write.banner("EXAMPLE 3.5 (PAGE 76)")
+
+#
+#	Define new data frame containing information for
+#	constructing predictions; and produce both prediction
+#	and confidence intervals
+#
+pred.years <- data.frame(Time=39:48)
+haddock.pred0.pred <- predict(trend.model0,newdata=pred.years,
+			se.fit=TRUE,interval="prediction")
+haddock.pred0.conf <- predict(trend.model0,newdata=pred.years,
+			se.fit=TRUE,interval="confidence")
+#
+#	Assemble results into a nice table, and output
+#
+haddock.predtab0 <- rbind(t(haddock.pred0.pred$fit),
+                          t(haddock.pred0.conf$fit),
+                          haddock.pred0.pred$se.fit)[-4,]
+rownames(haddock.predtab0) <- c("Fit","Pred.lo","Pred.hi",
+                                "Conf.lo","Conf.hi","SE")
+colnames(haddock.predtab0) <- 2001:2010
+cat("SUMMARY OF LOG BIOMASS PREDICTIONS, 2001-2010\n")
+cat("=============================================\n\n")
+print(round(haddock.predtab0,3))
+#
+#	Prediction intervals on the original rather than log scale
+#
+haddock.predlims <- exp(haddock.predtab0[2:3,])
+cat("\nCORRESPONDING BIOMASS PREDICTION INTERVALS\n")
+cat("==========================================\n\n")
+print(round(haddock.predlims,1))
+######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 3.6 (PAGE 78)
+#
+#######################################################################
+write.banner("EXAMPLE 3.6 INCLUDING FIGURE 3.2 (PAGE 78)")
+
+#
+#	Start by creating a simple artificial data set for 
+#	comparison - levels of caesium-137 in marine sediment, 
+#	hence the variable names
+#
+cs137.t <- c(1:4,12)
+cs137.y <- c(13,12,15,13,18)
+#
+#	Fit linear trend model to this data set
+#
+cs137.lm <- lm(cs137.y ~ cs137.t)
+#
+#	Now reset plot margins etc., and produce plots of 
+#	Cook's distances and leverages for both the Cs137
+#	and haddock data sets. Functions cook.plot() and
+#	lever.plot() are from file trendutils.r.
+#
+par(mfrow=c(2,2),mgp=c(2,0.75,0),tcl=-0.3,mar=c(3.5,4,3,2),
+    cex.lab=1.5,cex.axis=1.25,cex.main=1.5,lwd=2)
+cook.plot(cs137.lm,main="(a)",cex.id=1.2,
+           lab.id=paste("Quarter",cs137.t),xlim=c(0.5,5.5))
+lever.plot(cs137.lm,main="(b)",cex.id=1.2,
+           lab.id=paste("Quarter",cs137.t),xlim=c(0.5,5.5))
+cook.plot(trend.model0,x=haddock.data$Year,main="(c)",
+                         cex.id=1.2,xlab="Year",xlim=c(1962.5,2000)) 
+lever.plot(trend.model0,x=haddock.data$Year,main="(d)",
+                         cex.id=1.2,xlab="Year",xlim=c(1962.5,2000))
+#
+# 	Cook's distances indicate that 1963 is influential for haddock 
+# 	data - delete and refit the model to see what changes.
+#
+trend.model2 <- lm(logBiomass[-1] ~ Time[-1], data=haddock.data)
+cat("RESULTS FOR NAIVE LINEAR TREND MODEL WITHOUT 1963:\n\n")
+print(summary(trend.model2))
+#
+#	Residual plots (not in book)
+#
+par(mfrow=c(2,2),mgp=c(2,0.75,0),tcl=-0.3,mar=c(3.5,4,3,2),
+    cex.lab=1.5,cex.axis=1.25,cex.main=1.5,lwd=2)
+cat("Press a key to view residual plots for refitted model ...\n")
+readLines(n=1)
+e2 <- resid(trend.model2)
+plot(haddock.data$Year[-1],e2,type="l",xlab="Year",ylab="Residual",
+     main="(a)")
+abline(0,0,lty=2)
+plot(haddock.data$Year[-1],abs(e2),type="l",xlab="Year",
+     ylab=expression("|Residual|"),main="(b)")
+abline(mean(abs(e2)),0,lty=2)
+acf(e2,main="(c)")
+qqnorm(e2,main="(d)",pch=16)
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 3.9 (PAGE 107)
+#
+#######################################################################
+write.banner("EXAMPLE 3.9 INCLUDING FIGURE 3.5 (PAGE 107)")
+
+#
+# 	Calculate a periodogram of residuals from the original model
+#
+e0.pgm <- spec.pgram(e0,taper=0,detrend=FALSE,fast=FALSE,plot=FALSE)
+#
+# 	Approximate 5% and 1% critical values for Fisher's test
+#
+T2 <- floor(length(e0)/2)
+critvals <- (-log(c(0.05,0.01)/T2)/T2)*sum(e0.pgm$spec)
+#
+#	Plot the periodogram
+#
+par(mfrow=c(1,1))
+plot(e0.pgm$freq,e0.pgm$spec,type="h",xlab="f (cycles/year)",
+     ylab=expression(I(f)),ylim=range(c(e0.pgm$spec,critvals)))
+abline(critvals[1],0,lty=2)
+abline(critvals[2],0,lty=3)
+legend(0.3,0.9,legend=c("5%","1%"),lty=c(2,3),
+       title="Critical values",cex=1.5)
+#
+#	And output the cycle lengths corresponding to the largest
+#	periodogram ordinates
+#
+cat("CYCLE LENGTHS WITH LARGE RESIDUAL PERIODOGRAM ORDINATES\n")
+cat("=======================================================\n\n")
+order.periods <- 1 / e0.pgm$freq[order(e0.pgm$spec,decreasing=TRUE)]
+cat(paste(round(order.periods[1:2],2),"years\n"))
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 5.2 (PAGE 183)
+#
+#######################################################################
+write.banner("EXAMPLE 5.2 INCLUDING FIGURE 5.3 (PAGE 183)")
+
+#
+# 	Model identification starts with ACF and PACF of residuals 
+# 	from initial linear trend model (ACF shown in Figure 3.1, 
+#	PACF not in book)
+#
+par(mfrow=c(2,1))
+acf(e0,main="Residual ACF for initial haddock biomass model")
+pacf(e0,main="Residual PACF for initial haddock biomass model")
+#
+#	Having identified an AR(2) as a tentative model for residual
+#	structure, refit the entire model including the regression
+#	part. It is helpful to attach the data frame for the 
+#	arima() command; then detach again immediately afterwards.
+#
+attach(haddock.data)
+trend.model3 <- arima(logBiomass,order=c(2,0,0),xreg=Time)
+detach(haddock.data)
+cat("LINEAR MODEL WITH AR(2) ERRORS\n")
+cat("==============================")
+print(trend.model3)
+#
+#	And produce diagnostics
+#
+par(mfrow=c(1,1))
+cat("\nPress a key to view diagnostic plots ...\n")
+readLines(n=1)
+tsdiag(trend.model3,cex.main=2)
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 5.7 (PAGE 196)
+#
+#######################################################################
+write.banner("EXAMPLE 5.7 INCLUDING FIGURE 5.6 (PAGE 196)")
+
+#
+#	Useful to attach the data frame throughout this example
+#
+attach(haddock.data)
+#
+#	Start by generating ACF of log biomass, along with plots
+#	for the differenced series
+#
+par(mfrow=c(2,2))
+acf(logBiomass,main="(a)")
+plot(Year[-1],diff(logBiomass),type="l",xlab="Year",
+     ylab="Difference",main="(b)")
+abline(mean(diff(logBiomass)),0,lty=2)
+text(1975,0.8,"Dashed line indicates mean of series",adj=0)
+acf(diff(logBiomass),main="(c)")
+pacf(diff(logBiomass),main="(d)")
+#
+#	Fit ARIMA(2,1,0) model in two different ways: either fit an 
+#	AR(2) to the differences, or an ARIMA(2,1,0) directly. Table 
+#	5.2 in the book gives the results from the second method.
+#
+arima.model1a <- arima(diff(logBiomass),order=c(2,0,0),include.mean=TRUE)
+arima.model1b <- arima(logBiomass,order=c(2,1,0),xreg=Time)
+cat("ARIMA(2,1,0) MODEL WITH A CONSTANT (METHOD 1):\n")
+cat("==============================================")
+print(arima.model1a)
+cat("\nARIMA(2,1,0) MODEL WITH A CONSTANT (METHOD 2):\n")
+cat("==============================================")
+print(arima.model1b)
+#
+# 	Surprise! Constant term is nowhere near significant. Drop it
+# 	and try again
+#
+arima.model2 <- arima(logBiomass,order=c(2,1,0))
+cat("\nARIMA(2,1,0) MODEL WITH NO CONSTANT:\n")
+cat("====================================")
+print(arima.model2)
+#
+# Looks better. Run tsdiag 
+#
+par(mfrow=c(1,1))
+tsdiag(arima.model2,cex.main=2)	# Looks fine
+#
+#	And detach the data frame
+#
+detach(haddock.data)
+######################################################################
+#######################################################################
+#
+# 	EXAMPLE 5.3 (PAGE 189)
+#
+#######################################################################
+write.banner("EXAMPLE 5.3 INCLUDING FIGURE 5.4 (PAGE 189)")
+
+#
+#	NB these plots use the arima objects haddock.lm and 
+#	haddock.arima created for Figure 1.2 at the top of this 
+#	script, rather than the objects trend.model3 and 
+#	arima.model2 created for Examples 5.2 and 5.7 respectively.
+#	The reason is that prediction intervals were already 
+#	calculated for Figure 1.2 - the objects are identical
+#	however (except for differences in variable names).
+#	Start by setting plot margins and plotting the data 
+#	from 1980 onwards on a log scale.
+#
+
+par(mfrow=c(1,2),mar=c(8,4,4,2),cex=1.2)
+attach(haddock.data)
+plot(Year[Year >= 1980],Biomass[Year >= 1980],type="l",lwd=3,
+     xlim=c(1980,max(predyrs)),ylim=ylim,log="y",
+     xlab="Year",ylab="Thousands of tonnes",main="(a)")
+detach(haddock.data)
+#
+#	Add the prediction intervals from the trend-stationary
+#	model (all objects were created for Fig 1.2)
+#
+lines(predyrs,exp(lm.preds$pred),lwd=3,lty=2)
+lines(predyrs,lm.ll95,lwd=3,lty=3)
+lines(predyrs,lm.ul95,lwd=3,lty=3)
+#
+#	Add the *actual* biomass figures
+#
+pred.rows <- haddock.all$Year > 2000
+points(haddock.all$Year[pred.rows],haddock.all$Biomass[pred.rows],
+		pch=16,cex=1.5)
+#
+#	And a legend
+#
+legend(1979,45,c("Observations to 2000",
+                 "Observations, 2001-2004",
+                 "Predictions",
+                  "95% prediction intervals"),
+                  lwd=2,lty=c(1,NA,2,3),pch=c(NA,16,NA,NA),
+       text.width=18,bty="n")
+#
+#	Same again for the difference-stationary model
+#
+attach(haddock.data)
+plot(Year[Year >= 1980],Biomass[Year >= 1980],type="l",lwd=3,
+     xlim=c(1980,max(predyrs)),ylim=ylim,log="y",
+     xlab="Year",ylab="Thousands of tonnes",main="(b)")
+detach(haddock.data)
+lines(predyrs,exp(arima.preds$pred),lwd=3,lty=2)
+lines(predyrs,arima.ll95,lwd=3,lty=3)
+lines(predyrs,arima.ul95,lwd=3,lty=3)
+points(haddock.all$Year[pred.rows],haddock.all$Biomass[pred.rows],
+		pch=16,cex=1.5)

@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1510580835942.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "5B6CF192",
+    "lastKnownWriteTime" : 4,
+    "last_content_update" : 1510580835942,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "5C266568",
+        "caption" : "BST.ana",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=BST.ana&cache_key=5C266568",
+        "displayedObservations" : 420,
+        "environment" : "",
+        "object" : "BST.ana",
+        "preview" : 0,
+        "totalObservations" : 420,
+        "variables" : 12
+    },
+    "relative_order" : 14,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1513024059508.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "12670CE9",
+    "lastKnownWriteTime" : 4294967040,
+    "last_content_update" : 1513024059508,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "6F3BB9E2",
+        "caption" : "BST.events",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=BST.events&cache_key=6F3BB9E2",
+        "displayedObservations" : 2251,
+        "environment" : "",
+        "object" : "BST.events",
+        "preview" : 0,
+        "totalObservations" : 2251,
+        "variables" : 6
+    },
+    "relative_order" : 3,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

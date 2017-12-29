@@ -1,0 +1,21 @@
+{
+    "collab_server" : "",
+    "contents" : "############################################################\n####   STEP 1. Reading and recoding the data            ####\n####                                                    ####\n####   Aim: (1) Reading all the files                   ####\n####        (2) Tidy the data                           ####\n############################################################\n\n#### A. - CMABST\n#### 1.1 Reading\n\n# Using list.files to read all the data\nlibrary(foreign)\nfile.list <- list.files(path = \"./Data/CMABST\", full.names=TRUE)\n\n# Constructing a dataframe\nBST.all.data <- data.frame()\n\nfor (current.files in file.list){\n  \n  # Read THE data\n  tempData <- read.table(current.files, header=FALSE,  fill = T, sep=\"\")\n  # Combine the data in one dataframe\n  BST.all.data <- rbind(BST.all.data, tempData)\n  \n}\n\n\n\n\n## 1.2 Cleaning the data\n##\n## i Replacing\n##\n## a. Name \n\na = 0\nb = 1\n\nBST.all.data[,8]=replace(BST.all.data[,8],BST.all.data[,8]==\"\",NA)\n\nwhile (a < 68514){\n  a = a + 1\n  \n  if (is.na(BST.all.data[a,8]) == TRUE){\n    \n    BST.all.data[a,8] <- BST.all.data[b,8]\n    \n  }\n  else { b = a }\n}\n\n## b. Serial Number\n\nBST.all.data <- within(BST.all.data, SerialNum<- BST.all.data[,4])\nwanted.data <- BST.all.data[,1] == 66666\nsummary(BST.all.data$V4[wanted.data])\n\n\na = 0\nb = 1\n\nBST.all.data$SerialNum=replace(BST.all.data$SerialNum,BST.all.data$SerialNum>54,NA)\n\nwhile (a < 68514){\n  a = a + 1\n  \n  if (is.na(BST.all.data[a,10]) == TRUE){\n    \n    BST.all.data[a,10] <- BST.all.data[b,10]\n    \n  }\n  else { b = a }\n}\n\n\n\n## Save the data.frame into file\n## save(BST.all.data, file=\"ALL_CMABST.Rda\")\nwrite.table(BST.all.data, \"BST_All_Data.dat\", row.names = FALSE)\n\n## 1.2.2  Clean the headers\n\nHead.line <- 1\ni <- 0\nBST.clean <- BST.all.data\n\nwhile ( Head.line <= 68514 ){\n  \n  BST.clean <- BST.clean[- (Head.line - i),]\n  Head.line <- Head.line + BST.all.data[Head.line, 3] + 1\n  i <- i+1\n  \n}\n\nwrite.table(BST.clean, \"BST_no_header.dat\", row.names = FALSE)\n\n\n## 1.2.3  Create the new data.frame\n\nYear <- substr(BST.clean[,1], start = 1, stop = 4)\nMonth <- substr(BST.clean[,1], start = 5, stop = 6)\nDate <- substr(BST.clean[,1], start = 7, stop = 8)\nHour <- substr(BST.clean[,1], start = 9, stop = 10)\nName <- as.character(BST.clean[,8])\nIntensity <- BST.clean[,2]\nLatitude <- BST.clean[,3]\nLongitude <- BST.clean[,4]\nPres <- BST.clean[,5]\nWND <- BST.clean[,6]\nOWD <- BST.clean[,7]\nSerialNum <- BST.clean$SerialNum\nCMABST <- data.frame(Year, Month, Date, Hour,Name, SerialNum, Intensity, Latitude, Longitude, Pres, WND, OWD)\n\n#### Format cleaning\nCMABST$Latitude <- CMABST$Latitude/10\nCMABST$Longitude <- CMABST$Longitude/10\n\nsummary(CMABST$Latitude)\nsummary(CMABST$Longitude)\n\nCMABST$SerialNum = paste0(Year, \"-\",SerialNum,sep = \"\")\n\n#### B - Landfall\n\nLandfall <- read.csv(\"./Data/Landfall.csv\")\nnames(Landfall) <- c(\"Year\", \"Serial Number\", \"Chinese ID\", \"Name\", \n                     \"Total Times of Landfall\", \"Order of landfall\", \"Landfall Province\", \n                     \"Landfall Intensity Category\")\na = 0\nb = 1\nwhile (a <= 814){\n  a = a + 1\n  \n  if (is.na(Landfall[a,1]) == TRUE){\n    \n    Landfall[a,1] <- Landfall[b,1]\n    \n  }\n  else { b = a }\n}\n\nLandfall<- Landfall[-815,]\n\n## Rename the level to clean the strange symbols\nlevels(Landfall$`Landfall Province`)[11] <- \"Shanghai:Zhejiang\"\nlevels(Landfall$`Landfall Province`)[15] <- \"Zhejiang:Fujian\"\n\n",
+    "created" : 1509989720613.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2161868200",
+    "id" : "5FF2F671",
+    "lastKnownWriteTime" : 1509838407,
+    "last_content_update" : 1509838407,
+    "path" : "E:/UCL_Study/Project_typhoon/STAT3901 Project/Step1_Reading and Recoding.r",
+    "project_path" : "Step1_Reading and Recoding.r",
+    "properties" : {
+        "tempName" : "Untitled2"
+    },
+    "relative_order" : 12,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

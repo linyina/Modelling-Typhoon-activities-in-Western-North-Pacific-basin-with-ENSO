@@ -1,0 +1,21 @@
+{
+    "collab_server" : "",
+    "contents" : "## Reading the data\nSST<- read.table(file = \"./Data/SST/oisst.v2 monthly SST.txt\", header = TRUE, sep = \"\")\n\nplot(SST$NINO3.4, type=\"l\")\nplot(SST$ANOM.3, type=\"l\")\n",
+    "created" : 1509923657734.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "3866745704",
+    "id" : "399DD620",
+    "lastKnownWriteTime" : 1510095857,
+    "last_content_update" : 1510095857853,
+    "path" : "E:/UCL_Study/Project_typhoon/STAT3901 Project/Step3-1 Potential Predictor - SST Exploratory Analysis.R",
+    "project_path" : "Step3-1 Potential Predictor - SST Exploratory Analysis.R",
+    "properties" : {
+        "tempName" : "Untitled5"
+    },
+    "relative_order" : 8,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

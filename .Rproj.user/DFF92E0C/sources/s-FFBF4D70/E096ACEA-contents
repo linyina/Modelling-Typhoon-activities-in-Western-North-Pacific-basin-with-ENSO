@@ -1,0 +1,19 @@
+p2 <- glm(count~year+yearSqr, 
+          family="quasipoisson",
+          data=disc)
+
+p1Diag <- data.frame(disc,
+                     link=predict(p1, type="link"),
+                     fit=predict(p1, type="response"),
+                     pearson=residuals(p1,type="pearson"),
+                     resid=residuals(p1,type="response"),
+                     residSqr=residuals(p1,type="response")^2
+)
+
+ggplot(data=p1Diag, aes(x=fit, y=residSqr)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1) +
+  geom_abline(intercept = 0, slope = summary(p2)$dispersion,
+              color="green") +
+  stat_smooth(method="loess", se = FALSE) +
+  theme_bw() 

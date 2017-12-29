@@ -1,0 +1,95 @@
+date<- seq(as.Date("1982-01-01"), as.Date("2016-12-31"), by="days")
+
+df.daily <- data.frame(Date= date,
+                       Month= substr(date, start = 6, stop = 7),
+                       TS= rep(0, length(date)),
+                       TY= rep(0, length(date)),
+                       SuperTY= rep(0, length(date)))
+
+BST.clean<- CMABST
+BST.clean[BST.clean$Intensity==9,]$Intensity <- 0
+
+BST.date<- data.frame(Date = as.Date(paste0(BST.clean$Year, "-", BST.clean$Month, "-", BST.clean$Date)),
+                      Month= BST.clean$Month,
+                      Intensity = BST.clean$Intensity,
+                      SN=CMABST$SerialNum,
+                      TS= rep(0, length(BST.clean$SerialNum)),
+                      TY= rep(0, length(BST.clean$SerialNum)),
+                      SuperTY= rep(0, length(BST.clean$SerialNum)))
+
+Serial.list <- levels(BST.date$SN)
+
+a = 0
+
+while (a <= length(Serial.list)){
+  a = a + 1
+  wanted.data <- BST.date$SN == Serial.list[a]
+  TS <- BST.date$Intensity[wanted.data] >= 2
+  BST.date[wanted.data,][TS == TRUE,][1,]$TS <- 1
+  TY <- BST.date$Intensity[wanted.data] >= 4
+  BST.date[wanted.data,][TY == TRUE,][1,]$TY <- 1
+  SuperTY <- BST.date$Intensity[wanted.data] ==6
+  BST.date[wanted.data,][SuperTY == TRUE,][1,]$SuperTY <- 1
+}
+
+BST.binary<- merge(df.daily, BST.date, all = TRUE)
+BST.daily<- BST.binary[36337:73511,1:5]
+
+TS<- aggregate(TS ~ Date, BST.daily, sum)
+TY<- aggregate(TY~ Date, BST.daily, sum)
+SuperTY <- aggregate(SuperTY ~ Date, BST.daily, sum)
+
+Nino34 <- data.frame(Year= BST.ana$Year,
+                     Month=BST.ana$Month, 
+                     Nino3.4= BST.ana$NINO3.4,
+                     Nino3.4Lag7=BST.ana$sst.lag.7,
+                     Nino3.4Lag1=BST.ana$sst.lag.1)
+
+BST.binary<- data.frame(Date = TS$Date,
+                        Year= substr(TS$Date, start = 1, stop= 4),
+                        Month = substr(TS$Date, start = 6, stop= 7),
+                        TS = TS$TS,
+                        TY = TY$TY,
+                        SuperTY = SuperTY$SuperTY,
+                        TS.yst = c(0, TS$TS[1:12782]),
+                        TY.yst = c(0, TY$TY[1:12782]),
+                        SuperTY.yst = c(0, SuperTY$SuperTY[1:12782]),
+                        TS.2bef = c(0,0, TS$TS[1:12781]),
+                        TY.2bef = c(0,0, TY$TY[1:12781]),
+                        SuperTY.2bef = c(0, 0,SuperTY$SuperTY[1:12781]))
+
+aggregate(TS ~ Month, BST.binary, sum)
+aggregate(TY ~ Month, BST.binary, sum)
+aggregate(SuperTY ~ Month, BST.binary, sum)
+
+aggregate(TS.freq ~ Month, BST.ana, sum)
+aggregate(TY.freq ~ Month, BST.ana, sum)
+aggregate(SuperTY.freq ~ Month, BST.ana, sum)
+
+aggregate(freq ~ Month, BST.mon.TS[as.character(BST.mon.TS$Year)>=1982,], sum)
+
+BST.binary$Month <- as.integer(BST.binary$Month)
+BST.binary <- merge(Nino34,BST.binary, sort = FALSE)
+
+
+
+## turn TS aggregate function from max to sum
+BST.count.daily<- data.frame(Date = TS$Date,
+                             Year= substr(TS$Date, start = 1, stop= 4),
+                        Month = substr(TS$Date, start = 6, stop= 7),
+                        TS = TS$TS,
+                        TY = TY$TY,
+                        SuperTY = SuperTY$SuperTY,
+                        TS.yst = c(0, TS$TS[1:12782]),
+                        TY.yst = c(0, TY$TY[1:12782]),
+                        SuperTY.yst = c(0, SuperTY$SuperTY[1:12782]),
+                        TS.2bef = c(0,0, TS$TS[1:12781]),
+                        TY.2bef = c(0,0, TY$TY[1:12781]),
+                        SuperTY.2bef = c(0, 0,SuperTY$SuperTY[1:12781]))
+
+aggregate(TS ~ Month, BST.count.daily, sum)
+aggregate(TY ~ Month, BST.count.daily, sum)
+aggregate(SuperTY ~ Month, BST.count.daily, sum)
+
+BST.count.daily$Month <- as.integer(BST.count.daily$Month)
+BST.count.daily <- merge(Nino34,BST.count.daily, sort = FALSE)

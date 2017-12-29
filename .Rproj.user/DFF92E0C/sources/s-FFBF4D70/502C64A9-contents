@@ -1,0 +1,73 @@
+############################################
+#### 3-3 Deseasonalize to find time lag ####
+########################
+## Step 1: Find the cross correlation between SST and the TS/TY/SuperTY
+########################
+ccf.ts<-ccf(BST.ana$NINO3.4,BST.ana$TS.freq)
+ccf.ts
+plot(ccf.ts)
+ccf.ty<-ccf(BST.ana$NINO3.4, BST.ana$TY.freq)
+ccf.ty
+plot(ccf.ty)
+ccf.sty<-ccf(BST.ana$NINO3.4, BST.ana$SuperTY.freq)
+ccf.sty
+plot(ccf.sty)
+
+par(mfrow=c(3,1))
+plot(ccf.ts)
+plot(ccf.ty)
+plot(ccf.sty)
+dev.copy(pdf,"CCF before deseasonalize.pdf",width=8,height=6)
+dev.off()
+par(mfrow=c(1,1))
+
+########################
+## Step 2: It is quiet possible that the correlation is due to seasonality from the plot
+##         so we should try the deseasonalized ccf to find proper lag
+##         Method for deseasonalized - linear models - treat months as factor covariates
+########################
+
+seas.sst<- lm(BST.ana$NINO3.4 ~ as.factor(BST.ana$Month))
+sst.des<- summary(seas.sst)$residual
+summary(seas.sst)
+seas.ts <- lm(BST.ana$TS.freq ~ as.factor(BST.ana$Month))
+ts.des<- summary(seas.ts)$residual
+seas.ty <- lm(BST.ana$TY.freq ~ as.factor(BST.ana$Month))
+ty.des<- summary(seas.ty)$residual
+seas.sty<- lm(BST.ana$SuperTY.freq ~ as.factor(BST.ana$Month))
+superty.des<- summary(seas.sty)$residual
+
+#######################
+## Step 3: CCF after deseasonalize
+
+ccf.ts.des <- ccf(sst.des, ts.des)
+plot(ccf.ts.des)
+ccf.ts.des
+ccf.ts.des$lag[ccf.ts.des$acf==max(abs(ccf.ts.des$acf))]  # lag -7   lag 6
+
+sst.lag.7 <- c(rep(NA,7), BST.ana$NINO3.4)
+sst.lag.7 <- sst.lag.7[1:420]
+BST.ana$sst.lag.7<- sst.lag.7
+
+
+ccf.ty.des <- ccf(sst.des, ty.des)
+plot(ccf.ty.des)
+ccf.ty.des
+ccf.ty.des$lag[ccf.ty.des$acf==max(abs(ccf.ty.des$acf))]  # lag 3
+
+ccf.sty.des<- ccf(sst.des, superty.des)
+plot(ccf.sty.des)
+ccf.sty.des
+ccf.sty.des$lag[ccf.sty.des$acf==max(abs(ccf.sty.des$acf))] # lag 3
+
+sst.lag.1 <- c(NA, BST.ana$NINO3.4)
+sst.lag.1 <- sst.lag.1[1:420]
+BST.ana$sst.lag.1 <- sst.lag.1
+
+par(mfrow=c(3,1))
+plot(ccf.ts.des)
+plot(ccf.ty.des)
+plot(ccf.sty.des)
+dev.copy(pdf,"CCF after deseasonalize.pdf",width=8,height=6)
+dev.off()
+par(mfrow=c(1,1))

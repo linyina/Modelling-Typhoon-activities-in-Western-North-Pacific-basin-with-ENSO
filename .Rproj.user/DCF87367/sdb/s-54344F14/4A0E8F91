@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1510578269411.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "4A0E8F91",
+    "lastKnownWriteTime" : 1510578251,
+    "last_content_update" : 1510578269411,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "982B139C",
+        "caption" : "BST.mon.data",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=BST.mon.data&cache_key=982B139C",
+        "displayedObservations" : 816,
+        "environment" : "",
+        "object" : "BST.mon.data",
+        "preview" : 0,
+        "totalObservations" : 816,
+        "variables" : 6
+    },
+    "relative_order" : 14,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}

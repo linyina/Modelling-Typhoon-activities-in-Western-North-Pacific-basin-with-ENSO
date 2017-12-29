@@ -1,0 +1,7 @@
+BST.SN.freq<- aggregate(Intensity ~ SN + Year, BST.freq, max)
+BST.SN.freq$freq<- rep(1, length(BST.SN.freq$Year))
+
+merge(y=BST.freq, x=BST.SN.freq, sort = FALSE)
+
+BST.freq<- aggregate(Intensity ~ SN + Year + Month, BST.freq, max)
+BST.freq<- merge(BST.temp, BST.freq, all=TRUE)

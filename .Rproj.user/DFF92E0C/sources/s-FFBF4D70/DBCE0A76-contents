@@ -1,0 +1,971 @@
+#######################################################################
+#
+# R script for analysis of the Dutch wind speed data in 
+#
+# R.E. Chandler and E.M. Scott: Statistical Methods for 
+#  Trend Detection and Analysis in the Environmental Sciences.
+#  Wiley, Chichester, 2011. 
+#
+# This script contains code used for the following examples and 
+# figures in the book:
+#
+# 	Figure 1.1 					(page 7)
+#	Example 2.1 including Figure 2.1	(page 26)
+#	Example 2.2 including Figure 2.2	(page 29)
+#	Example 2.3 including Figure 2.3	(page 33)
+#	Example 2.6 including Figure 2.7	(page 43)
+#	Example 4.1 including Figure 4.1	(page 134)
+#	Example 4.2 including Figure 4.2	(page 138)
+#	Example 4.3 including Figure 4.3	(page 146)
+#	Example 4.4 including Figure 4.4	(page 149)
+#	Example 4.5 including Figure 4.5	(page 152)
+#	Example 4.6 including Figure 4.7	(page 157)
+#	Example 4.8 including Figure 4.8	(page 164)
+#	Example 6.1 including Figure 6.1	(page 237)
+#	Figure 6.2					(page 257)
+#
+# FILES REQUIRED:
+# ---------------
+#
+# The script requires the following files to be present in the 
+# current directory:
+#
+#	NLwind.rda
+#	trendutils.r 
+#
+# LIBRARIES REQUIRED
+# ------------------
+# The script requires the following add-on R libraries to be installed:
+#
+#	maps
+#	mgcv
+#	quantreg
+#	sm
+#	wavethresh	
+#
+#######################################################################
+#######################################################################
+#######################################################################
+
+#######################################################################
+#
+# 	DEFINE UTILITY FUNCTIONS AND LOAD REQUIRED LIBRARIES
+#
+#######################################################################
+source("trendutils.r")
+require(maps); require(mgcv); require(quantreg) 
+require(sm); require(wavethresh)
+
+#######################################################################
+#
+# 	FIGURE 1.1 (PAGE 7)
+#
+#######################################################################
+write.banner("FIGURE 1.1 (PAGE 7)")
+
+#
+#	Load data. The station names are stored as the row names of 
+#	the station.data object; these have underscore characters 
+#	instead of spaces, so change these for labelling purposes.
+#
+######################################################################
+load("NLwind.rda")
+sitenames <- gsub("_"," ",rownames(station.data))
+#
+# 	Open graphics window and set up space for 3 plots
+#
+x11(width=10,height=7)
+screen.setup <- rbind(c(0.05,0.45,0.15,0.85),
+                      c(0.55,0.95,0.52,0.9),
+                      c(0.55,0.95,0.05,0.43))
+split.screen(screen.setup)
+#
+# 	Here's the map of the Netherlands, with the weather stations
+# 	overlaid. Positioning the text labels of the weather stations
+# 	is a bit fiddly - effectively, it has to be done manually.
+#
+screen(1)
+par(mar=c(0,0,0,0))
+plot(nlmap.data$LONG,nlmap.data$LAT,axes=FALSE,type="l",xlab="",ylab="",col="grey")
+box(lwd=2)
+points(station.data$Long,station.data$Lat,pch=15,mkh=1.5)
+text.x <- station.data$Long; text.y <- station.data$Lat + 0.1
+text.x[2] <- text.x[2] - 0.5; text.y[2] <- station.data$Lat[2] - 0.1
+text.y[3] <- station.data$Lat[3] - 0.1
+text.x[4] <- text.x[4] + 0.4
+text.x[6] <- text.x[6] + 0.5; text.y[6] <- station.data$Lat[6]
+text.x[9] <- text.x[9] - 0.2
+text.x[10] <- text.x[10] + 0.4; text.y[10] <- station.data$Lat[10] - 0.1
+text.y[12] <- station.data$Lat[12] - 0.1
+text(text.x,text.y,sitenames)
+#
+# 	Now a time series plot of the annual means at Eelde
+#
+screen(2);par(mar=c(2,0,0,0),xpd=NA)
+wanted.rows <- NLwind.yearly$Site == 7
+y <- NLwind.yearly$Mean.wind[wanted.rows]
+y[NLwind.yearly$N[wanted.rows] < 335] <- NA
+plot(NLwind.yearly$Year[wanted.rows],y,type="l",lwd=2,
+	xlab="Year",ylab=expression(ms^-1),
+	xlim=c(1960,2002),ylim=c(4,5.5),tcl=-0.25,mgp=c(1.5,0.5,0))
+title(sitenames[7],line=1)
+par(xpd=FALSE)
+abline(mean(y,na.rm=TRUE),0,lty=2)
+#
+# 	And finally, annual means at De Bilt
+#
+screen(3);par(mar=c(2,0,0,0),xpd=NA)
+wanted.rows <- NLwind.yearly$Site == 3
+y <- NLwind.yearly$Mean.wind[wanted.rows]
+y[NLwind.yearly$N[wanted.rows] < 335] <- NA
+plot(NLwind.yearly$Year[wanted.rows],y,type="l",lwd=2,
+	xlab="Year",ylab=expression(ms^-1),
+	xlim=c(1960,2002),ylim=c(3,5),tcl=-0.25,mgp=c(1.5,0.5,0))
+title(sitenames[3],line=1)
+par(xpd=FALSE)
+abline(mean(y,na.rm=TRUE),0,lty=2)
+close.screen(all=TRUE)
+#
+#	Uncomment the following lines to generate an appropriate 
+#	graphics output file
+#
+# dev.copy(postscript,"Fig1.1.eps",width=10,height=7,onefile=TRUE)
+# dev.off()
+# dev.copy(pdf,"Fig1.1.pdf",width=10,height=7)
+# dev.off()
+######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 2.1 (PAGE 26)
+#
+#######################################################################
+write.banner("EXAMPLE 2.1 INCLUDING FIGURE 2.1 (PAGE 26)")
+
+#
+#	Graphics setup
+#
+par(mfrow=c(3,1),mgp=c(2.5,1,0),tcl=-0.3,mar=c(3.5,4,4,2),
+    cex.lab=1.75,cex.axis=1.5,cex.main=1.75)
+#
+# 	Extract data for De Bilt (complete record from 1961); set to 
+#	missing any annual values with fewer than 335 observations
+#
+wanted.rows <- NLwind.yearly$Site == 3 & NLwind.yearly$Year >= 1961
+x1 <- NLwind.yearly$Year[wanted.rows]
+y1 <- NLwind.yearly$Mean.wind[wanted.rows]
+y1[NLwind.yearly$N[wanted.rows] < 335] <- NA
+#
+#	Fig 2.1(a)
+#
+plot(x1,y1,xlab="Year",ylab=expression(ms^-1),main="(a)",pch=19,
+	ylim=c(0,1.05*max(y1,na.rm=TRUE)))
+#
+# 	Fig 2.1(b)
+#
+plot(x1,y1,type="l",lwd=2,xlab="Year",ylab=expression(ms^-1),
+     ylim=c(3,5),main="(b)")
+ybar1 <- mean(y1,na.rm=TRUE)
+abline(ybar1,0,lty=2)
+text(1985,3.25,"Dashed line indicates mean of series",adj=0,cex=1.75)
+#
+# 	Now extract data for IJmuiden
+#
+wanted.rows <- NLwind.yearly$Site == 1 & NLwind.yearly$Year >= 1961
+x2 <- NLwind.yearly$Year[wanted.rows]
+y2 <- NLwind.yearly$Mean.wind[wanted.rows]
+y2[NLwind.yearly$N[wanted.rows] < 335] <- NA
+#
+#	Fig 2.1(c)
+#
+plot(x2,y2,type="l",lwd=2,xlab="Year",ylab=expression(ms^-1),
+     ylim=c(5,8),main="(c)")
+ybar2 <- mean(y2,na.rm=TRUE)
+abline(ybar2,0,lty=2)
+text(1985,5.25,"Dashed line indicates mean of series",adj=0,cex=1.75)
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 2.2 (PAGE 29)
+#
+#######################################################################
+write.banner("EXAMPLE 2.2 INCLUDING FIGURE 2.2 (PAGE 29)")
+
+#
+#	Graphics setup
+#
+par(mfrow=c(2,1),mgp=c(2.5,1,0),tcl=-0.3,mar=c(3.5,4,3,2),
+     cex.lab=1.25,cex.axis=1.25,cex.main=1.5)
+#
+# 	Fig 2.2(a)
+#
+boxplot(De_Bilt ~ Month,data=DeBilt.daily,xlab="Month",
+        ylab=expression(ms^-1),main="(a)",lwd=2,pch=4)
+box(lwd=2)
+#
+# 	Define pentads, omitting partial pentad centred on 1960
+#
+pentad <- 5*round(DeBilt.daily$Year/5)
+pentad[pentad == 1960] <- NA
+#
+#	Fig 2.2(b)
+#
+boxplot(De_Bilt ~ pentad,data=DeBilt.daily,xlab="Year",
+        ylab=expression(ms^-1),main="(b)",lwd=2,pch=4)
+box(lwd=2)
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 2.3 (PAGE 33)
+#
+#######################################################################
+write.banner("EXAMPLE 2.3 INCLUDING FIGURE 2.3 (PAGE 33)")
+
+#
+#	Graphics setup
+#
+par(mfrow=c(2,2),mgp=c(2.5,1,0),tcl=-0.3,mar=c(4,4,3,2),
+     cex.lab=1.5,cex.axis=1.5,cex.main=1.5,lwd=2)
+#
+# 	Fig 2.3(a). The cumsum(!is.na(y)) thing is a trick to 
+#	discard any NAs from the beginning of a series (mainly to 
+#	ensure that the confidence bands on the ACF are in the 
+#	right place)
+#
+y <- DeBilt.monthly[,4]
+acf(y[cumsum(!is.na(y)) > 0],na.action=na.pass,
+                                 main="",xlab="Lag (months)")
+title(main="(a)",line=1)
+#
+# 	Calculate seasonally adjusted series, dividing by the mean for 
+#	each month. A quick way to do this is to take the fitted values 
+# 	from a linear regression on "month" taken as a factor. However, 
+
+
+# 	the  "fitted" attribute of the result does not include the 
+#	missing values - need to keep track of where these should be, 
+#	therefore. 
+#
+anomalies <- rep(NA,length(y))
+data.pos <- !is.na(y)
+seasadj <- fitted(lm(y ~ as.factor(Month), data=DeBilt.monthly))
+anomalies[data.pos] <- y[data.pos] / seasadj
+#
+#	Fig 2.3(b)
+#
+acf(anomalies,na.action=na.pass,main="",xlab="Lag (months)",lag.max=60)
+title(main="(b)",line=1)
+#
+# 	Now ACF for annual wind speeds. Discard any year with fewer than 
+# 	360 days' data. NB there is an error in the plot shown in the 
+#	book: not only is it for the wrong site (Hoek van Holland - site
+#	9 rather than site 3 in code below), but it is for the time series 
+#	of annual wind speed standard	deviations (column 5 of NLwind.yearly
+#	rather than column 4). Oops. 
+#
+wanted.rows <- NLwind.yearly$Site == 3
+y <- NLwind.yearly[wanted.rows,4]
+y[NLwind.yearly$N[wanted.rows] < 360] <- NA
+acf(y[cumsum(!is.na(y)) > 0],na.action=na.pass,main="",xlab="Lag (years)")
+title(main="(c)",line=1)
+#
+# 	Compute seasonally adjusted daily wind speeds. Here, do adjustment 
+#     via a regression on day of month nested within month, since the 
+#	fitted values from such a model are the means for each calendar
+#	day.
+#
+anomalies <- rep(NA,nrow(DeBilt.daily))
+data.pos <- !is.na(DeBilt.daily$De_Bilt)
+seasadj <- fitted(lm(De_Bilt ~ as.factor(Month) + as.factor(Day)%in%Month,
+                               data=DeBilt.daily))
+anomalies[data.pos] <- DeBilt.daily$De_Bilt[data.pos] / seasadj
+#
+#	Fig 2.3(d)
+#
+acf(anomalies,na.action=na.pass,main="",xlab="Lag (days)")
+title(main="(d)",line=1)
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 2.6 (PAGE 43)
+#
+#######################################################################
+write.banner("EXAMPLE 2.6 INCLUDING FIGURE 2.7 (PAGE 43)")
+
+#
+# 	Recalculate monthly anomalies as in Example 2.3 above (*100)
+#
+y <- DeBilt.monthly$Mean.wind
+anomalies <- rep(NA,length(y))
+data.pos <- !is.na(y)
+seasadj <- fitted(lm(y ~ as.factor(Month), data=DeBilt.monthly))
+anomalies[data.pos] <- 100 * y[data.pos] / seasadj
+#
+#	Make a time variable as a "decimal year", for plotting 
+#	purposes. NB t means "transpose" in R, so call it tt
+#
+tt <- (DeBilt.monthly$Year + (DeBilt.monthly$Month / 12) - 1/24)
+#
+#	Discard unwanted NAs at the start
+#
+wanted.rows <- DeBilt.monthly$Year >= 1961
+anomalies <- anomalies[wanted.rows]; tt <- tt[wanted.rows]
+#
+#	Fig 2.7(a)
+#
+ylim <- c(50,165)
+plot(tt,anomalies,type="l",lwd=2,xlab="Year",ylab="%",ylim=ylim,yaxt="n",
+     main="(a)")
+axis(side=2,at=c(50,100,150))
+abline(100,0,lty=2)
+#
+# 	Now define some filters:
+#
+# 	(a) A 61-point moving average
+# 	(b) A 15-point moving average
+# 	(c) A 15-point filter based on cubic polynomials
+#
+w1 <- rep(1,61); w1 <- w1 / sum(w1)
+w2 <- rep(1,15); w2 <- w2 / sum(w2)
+w3 <- polyfil(7,3)
+#
+# 	Fig 2.7(b)
+#
+plot(tt,anomalies,type="p",xlab="Year",ylab="%",ylim=ylim,yaxt="n",
+     main="(b)",col="grey")
+axis(side=2,at=c(50,100,150))
+abline(100,0,lty=2)
+lines(tt,filter(anomalies,w1),lwd=2)
+#
+#	Fig 2.7(c)
+#
+plot(tt,anomalies,type="p",xlab="Year",ylab="%",ylim=ylim,yaxt="n",
+     main="(c)",col="grey")
+axis(side=2,at=c(50,100,150))
+abline(100,0,lty=2)
+lines(tt,filter(anomalies,w2),lwd=2)
+#
+#	Fig 2.7(d)
+#
+plot(tt,anomalies,type="p",xlab="Year",ylab="%",ylim=ylim,yaxt="n",
+     main="(d)",col="grey")
+axis(side=2,at=c(50,100,150))
+abline(100,0,lty=2)
+lines(tt,filter(anomalies,w3),lwd=2)
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 4.1 (PAGE 134)
+#
+#######################################################################
+write.banner("EXAMPLE 4.1 INCLUDING FIGURE 4.1 (PAGE 134)")
+
+#
+#	Extract annual data from De Bilt, for years with at least 
+#	335 contributing observations
+#
+wanted.rows <- NLwind.yearly$Site == 3 & 
+              !is.na(NLwind.yearly$Mean.wind) &
+              (NLwind.yearly$N >= 335)
+x1 <- NLwind.yearly$Year[wanted.rows]
+y1 <- NLwind.yearly$Mean.wind[wanted.rows]
+#
+#	Graphics setup	
+#
+par(mfrow=c(1,2),mgp=c(2.5,1,0),tcl=-0.3,mar=c(4,4,3,2),
+     cex.lab=1.2,cex.axis=1.2,cex.main=1.25,lwd=2)
+#
+# 	Local linear smooths with two different bandwidths
+#
+sm.model0 <- sm.regression(x1,y1,model="none",display="none",method="cv",
+                        eval.points=x1,se=TRUE)
+sm.model1 <- sm.regression(x1,y1,model="none",display="none",df=4,
+                        eval.points=x1)
+#
+#	Fig 4.1(a)
+#
+plot(x1,y1,pch=20,xlab="Year",ylab=expression(ms^-1),
+     ylim=c(3,5),main="(a)")
+ybar1 <- mean(y1,na.rm=TRUE)
+abline(ybar1,0,lty=3)
+lines(sm.model0$eval.points,sm.model0$estimate)
+lines(sm.model0$eval.points,sm.model1$estimate,lty=2)
+legend("bottomleft",lty=1:3,legend=c("Cross-validation",
+                                     expression(df[par] == 4),
+                                     "Mean of series"),bty="n")
+#
+#	Regression spline smooth with smoothing parameter chosen
+#	via cross-validation
+#
+mgcv.model0 <- gam(y1 ~ s(x1,bs="cr"))
+#
+#	Fig 4.1(b)
+#
+plot(x1,y1,pch=20,xlab="Year",ylab=expression(ms^-1),
+     ylim=c(3,5),main="(b)")
+lines(x1,fitted(mgcv.model0))
+abline(ybar1,0,lty=3)
+#
+#	Figure out the effective degrees of freedom for the 
+#	cross-validated sm model (a bit messy - sm.regression
+#	doesn't provide these so it's done numerically by 
+#	matching the bandwidth). 
+#
+sm.bandwidth <- sm.model0$h
+sm.df.err <- function(df,h,x,y) {h-h.select(x,y,df=df)}
+sm.df <- uniroot(sm.df.err,interval=c(2.5,6),x=x1,y=y1,h=sm.bandwidth)$root
+#
+#	Output EDF for the cross-validated models. NB need to add 
+#	1 to the value returned by gam(), because this value
+#	doesn't account for the constant term in the model
+#
+cat("EFFECTIVE DEGREES OF FREEDOM FOR CV MODELS:\n")
+cat("===========================================\n\n")
+cat(paste("Local linear regression:",round(sm.df,1),"\n"))
+cat(paste("Penalised regression spline:",
+           round(1+summary(mgcv.model0)$edf,1),"\n"))
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 4.2 (PAGE 138)
+#
+#######################################################################
+write.banner("EXAMPLE 4.2 INCLUDING FIGURE 4.2 (PAGE 138)")
+
+#
+#	Graphics setup
+#
+par(mfrow=c(2,2),mgp=c(2.5,1,0),tcl=-0.3,mar=c(4,4,3,2),
+     cex.lab=1.2,cex.axis=1.2,cex.main=1.25,lwd=2)
+#
+#	Fig 4.2(a) (NB uses model fitted for Example 4.1)
+#
+plot(x1,y1,pch=20,xlab="Year",ylab=expression(ms^-1),
+     ylim=c(3,5),main="(a)")
+polygon(c(sm.model0$eval.points,rev(sm.model0$eval.points)),
+        c(sm.model0$estimate-1.96*sm.model0$se,
+          rev(sm.model0$estimate+1.96*sm.model0$se)),
+        border=NA,col=grey(0.8))
+lines(sm.model0$eval.points,sm.model0$estimate)
+points(x1,y1,pch=20)
+abline(ybar1,0,lty=3)
+title(main="(a)")
+#
+#	Fig 4.2(b) (plot is produced automatically by sm.regression() -
+#	in the earlier examples this was suppressed using the
+#	argument display="none")
+#
+cat("Testing for linearity ...\n")
+sm.model2 <- sm.regression(x1,y1,method="cv",model="linear",xlab="Year",
+                        ylab=expression(ms^-1),ylim=c(3,5),
+                        eval.points=x1,col.band=grey(0.8))
+title(main="(b)")
+points(x1,y1,pch=20)
+abline(lm(y1~x1),lwd=1)
+text(2000,4.8,adj=1,cex=1.1,
+     labels=paste("Test of linearity: p=",round(sm.model2$p,3),sep=""))
+#
+#	Significance trace (Fig 4.2(c))
+#
+cat("\nComputing significance trace ...\n\n")
+pvals <- sig.trace(sm.regression(x1,y1,display="none",model="linear",
+                        eval.points=x1),
+                   hvec=seq(2,20,0.5),display="none")
+plot(pvals$h,pvals$p,type="l",xlab="Bandwidth, h (years)",
+     ylab="p-value",ylim=c(0,0.1),main="(c)")
+#
+#	Add horizontal line at 0.05, and vertical lines at
+#	"automatic" smoothing parameter choices
+#
+abline(h=0.05,lty=2)
+auto.h <- c(h.select(x1,y1,method="cv"),
+            h.select(x1,y1,method="aicc"))
+abline(v=auto.h,lwd=1)
+text(x=auto.h[1],y=0.095,labels="CV  ",adj=1)
+text(x=auto.h[2],y=0.095,labels="  AICC",adj=0)
+#
+#	Residual ACF
+#
+e <- y1 - sm.model2$estimate
+acf(e,main="",xlab="Lag (years)",mar=par("mar"),mgp=par("mgp"),oma=par("oma"))
+title(main="(d)")
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 4.3 (PAGE 146)
+#
+#######################################################################
+write.banner("EXAMPLE 4.3 INCLUDING FIGURE 4.3 (PAGE 146)")
+
+#
+#	Extract monthly data for De Bilt (data frame already 
+#	has NAs for any month with fewer than 25 contributing
+#	observations)
+#
+wanted.rows <- !is.na(DeBilt.monthly$Mean.wind)
+y <- DeBilt.monthly$Mean.wind[wanted.rows]
+logy <- log(y,base=10)
+#
+#	Define a "decimal year" for plotting
+#
+Year <- (DeBilt.monthly$Year + (DeBilt.monthly$Month) / 12 - 1/24)[wanted.rows]
+Year.plot <- unique(DeBilt.monthly$Year[wanted.rows])
+Month <- DeBilt.monthly$Month[wanted.rows]
+#
+#	Bivariate smooth using tensor product basis (=interaction
+#	between smooth terms). Yes, it's model2 and we don't have
+#	model1 yet. Wait a moment ...
+#
+monthly.model2 <- gam(logy ~ te(Year,Month,bs=c("cr","cc")))
+#
+#	And additive model. Logically this belongs *before* the 
+#	the bivariate model, but for formal comparison need to 
+#	ensure that the smoothing parameters here are at least 
+#	as large as for the bivariate	model (without doing this, 
+#	the cross-validated choices actually lead to a higher 
+#	deviance for the bivariate model!)
+#
+monthly.model1 <- gam(logy ~ s(Year) + s(Month,bs="cc"),
+                      min.sp=rev(monthly.model2$sp))
+#
+#	Summarise and compare models formally
+#
+cat("\nSUMMARY OF ADDITIVE MODEL FOR MONTHLY DATA:\n")
+cat("===========================================\n")
+print(summary(monthly.model1))
+cat("\nSUMMARY OF BIVARIATE MODEL FOR MONTHLY DATA:\n")
+cat("============================================\n")
+print(summary(monthly.model2))
+cat("\nCOMPARISON OF ADDITIVE AND BIVARIATE MODELS:\n")
+cat("============================================\n")
+print(anova(monthly.model1,monthly.model2,test="F"))
+#
+# 	And plot the fits. Fig 4.3(a)
+#     
+plot(monthly.model1,pages=0,shade=TRUE,rug=FALSE,select=1,
+     ylim=c(-0.1,0.1),ylab=expression(log[10]*(ms^-1)),main="(a)")
+abline(0,0,lty=2)
+#
+#	Fig 4.3(b)
+#
+plot(monthly.model1,pages=0,shade=TRUE,rug=FALSE,select=2,
+     ylim=c(-0.1,0.1),ylab=expression(log[10]*(ms^-1)),main="(b)")
+abline(0,0,lty=2)
+#
+#	Fig 4.3(c). NB plot.gam() doesn't provide too much
+#	flexibility with labelling etc. for 2-d smooths, 
+#     so generate the plot separately: bold contours for estimates, 
+#	dashed ones for standard errors
+#
+mm2.fit <- predict(monthly.model2,se.fit=TRUE,
+                   data=data.frame(Year=Year,Month=Month))
+mm2.mhat <- matrix(mm2.fit$fit,nrow=12)
+mm2.se <- matrix(mm2.fit$se.fit,nrow=12)
+contour(x=Year.plot,y=1:12,z=t(mm2.mhat),xlab="Year",ylab="Month",
+        nlevels=4,las=1,labcex=0.8,vfont=c("serif","bold"),main="(c)")
+contour(x=Year.plot,y=1:12,z=t(mm2.se),xlab="Year",ylab="Month",
+        nlevels=2,add=TRUE,lwd=1,lty=2)
+#
+#	Fig 4.3(d)
+#
+boxplot(resid(monthly.model2) ~ Month,xlab="Month",ylab="Residuals",main="(d)")
+abline(0,0,lty=2)
+#
+#	Residual ACF - plot, and print the value at lag 1 (NB this is the
+#	second element of the stored result, since the first is for lag 0)
+#
+par(mfrow=c(1,1))
+cat("\nPress a key for next plot ...\n")
+readLines(n=1)
+resid.acf <- acf(resid(monthly.model2),main="Residual ACF for bivariate model",
+                 xlab="Lag (years)")
+cat(paste("Lag 1 residual autocorrelation for bivariate model is",
+          round(resid.acf$acf[2],3),"\n"))
+#
+# 	Finish off with a bootstrap comparison of the additive 
+#	and bivariate models. As a check on the bootstrap calculations, 
+#     start by calculating the observed F-statistic and p-value 
+#	manually -	should agree with those from anova above
+#
+df1 <- sum(monthly.model2$edf)-sum(monthly.model1$edf)
+df2 <- monthly.model2$df.residual
+F.obs <-  ((deviance(monthly.model1)-deviance(monthly.model2)) / df1 ) /
+                   ( deviance(monthly.model2) / df2)
+cat("\nBOOTSTRAP COMPARISON:\n")
+cat("=====================\n")
+cat(paste("Observed F statistic:",round(F.obs,3),"\n"))
+cat(paste("P-value from F(",round(df1,1),",",round(df2,1),"): ",
+          round(pf(F.obs,df1,df2,lower.tail=FALSE),3),"\n",sep=""))
+#
+#	User chooses number of bootstrap samples
+#
+cat("\nEnter number of bootstrap samples required (a value of 10000\n")
+cat("will reproduce p-values in book, but may take 20-30 minutes to run):\n")
+nboot <- readLines(n=1)
+#
+#	Define storage for bootstrap results
+#
+boot.stats <- rep(NA,nboot)
+resid.matrix <- matrix(resid(monthly.model2),nrow=12)
+nblocks <- ncol(resid.matrix)
+null.m <- fitted(monthly.model1)
+#
+#	Set seed to ensure repeatable bootstrap results
+#
+set.seed(20000)
+#
+#	And do the bootstrapping: resample data in blocks, refit the
+#	two models and compute the F-statistic each time
+#
+for (i in 1:nboot) {
+ if (i %% 10 == 0) cat(paste("\rBootstrap sample",i,"of",nboot,
+                             "[click to refresh if display doesn't update]"))
+ boot.blocks <- sample(1:nblocks,replace=TRUE)
+ boot.data <- null.m + as.numeric(resid.matrix[,boot.blocks])
+ boot.model2 <- gam(boot.data ~ te(Year,Month,bs=c("cr","cc")))
+ boot.model1 <- gam(boot.data ~ s(Year) + s(Month,bs="cc"),
+                                min.sp=rev(boot.model2$sp))
+ boot.df1 <- sum(boot.model2$edf)-sum(boot.model1$edf)
+ boot.df2 <- boot.model2$df.residual
+ boot.stats[i] <- ((deviance(boot.model1)-deviance(boot.model2)) / boot.df1 ) / 
+                   ( deviance(boot.model2) / boot.df2 )
+}
+#
+#	Output result
+#
+cat(paste("\nBootstrap p-value (based on",nboot,"samples):",
+          round(mean(boot.stats > F.obs),3),"\n"))
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 4.4 (PAGE 149)
+#
+#######################################################################
+write.banner("EXAMPLE 4.4 INCLUDING FIGURE 4.4 (PAGE 149)")
+
+#
+# 	GAMs for monthly data with and without autocorrelation, 
+#	with unrestricted automatic choice of smoothing parameter
+#
+monthly.model3 <- gam(logy ~ s(Year) + s(Month,bs="cc"))
+cat("Fitting gamm - please be patient, this takes a few seconds ...\n")
+monthly.model4 <- gamm(logy ~ s(Year) + s(Month,bs="cc"),correlation=corAR1())
+cat("\nADDITIVE MODEL: UNCONSTRAINED SMOOTHING PARAMETER:\n")
+cat("==================================================\n")
+print(summary(monthly.model3))
+cat("\nADDITIVE MODEL: GAMM FIT:\n")
+cat("=========================\n")
+print(summary(monthly.model4$gam))
+print(monthly.model4$lme$modelStruct$corStruct)
+#
+#	Graphics setup
+#
+par(mfrow=c(1,2),mgp=c(2.5,1,0),tcl=-0.3,mar=c(4,4,3,2),
+     cex.lab=1.2,cex.axis=1.2,cex.main=1.25,lwd=2)
+#
+#	Fig 4.4(a)
+#
+plot(monthly.model3,pages=0,shade=TRUE,rug=FALSE,select=1,
+     ylim=c(-0.1,0.1),ylab=expression(log[10]*(ms^-1)),main="(a)")
+#
+#	Fig 4.4(b)
+#
+plot(monthly.model4$gam,pages=0,shade=TRUE,rug=FALSE,select=1,
+     ylim=c(-0.1,0.1),ylab=expression(log[10]*(ms^-1)),main="(b)")
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 4.5 (PAGE 152)
+#
+#######################################################################
+write.banner("EXAMPLE 4.5 INCLUDING FIGURE 4.5 (PAGE 152)")
+
+#
+#	Convert monthly windspeeds (defined in Example 4.3 above) 
+#	to a time series object in preparation for an STL decomposition
+#
+y.ts <- ts(y,start=c(Year[1],Month[1]),frequency=12)
+#
+#	Redefine graphics settings with a new window better suited
+#	to STL aspect ratio
+#
+dev.off(); x11(width=8,height=6)
+par(mgp=c(2.5,1,0),tcl=-0.3,cex.lab=1.2,cex.axis=1.1,cex.main=1.25,lwd=2)
+#
+# 	And plot the decomposition (Fig 4.5)
+#
+plot(stl(y.ts,s.window=21,t.window=241,robust=TRUE,s.jump=1,t.jump=1),
+     set.pars=list(mar=c(0,6,0,6),oma=c(5,0,1,0),mfrow=c(4,1)))
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 4.6 (PAGE 157)
+#
+#######################################################################
+write.banner("EXAMPLE 4.6 INCLUDING FIGURE 4.7 (PAGE 157)")
+
+#
+#	Again, redefine graphics settings in a new window
+#
+dev.off(); x11(width=10,height=6)
+par(mfrow=c(1,2),mgp=c(2.5,1,0),tcl=-0.3,mar=c(4,4,3,2),
+     cex.lab=1.2,cex.axis=1.2,cex.main=1.25,lwd=2)
+#
+# 	This example works with the log monthly wind speeds that are
+# 	already stored in logy. Start by adding 4 observations to each 
+# 	end so that the series length is a power of 2
+#
+logy.padded <- c(logy[9:12],logy,logy[493:496])
+#
+#	LA16 decomposition
+#
+monthly.l16 <- wd(logy.padded,filter.number=8,
+                      family="DaubLeAsymm",bc="symmetric")
+#
+#	Fig 4.7(a)
+#
+plot(monthly.l16,scaling="global",main="(a)",sub="",xlab="k",ylab="j")
+#
+# 	Threshold levels 3-8 and invert the transform to get 
+#	estimates of trend (apply boundary corrections).
+#
+l16.ctilde1 <- threshold(monthly.l16,levels=3:8,boundary=TRUE,type="soft",
+                         policy="universal",dev=var,by.level=TRUE)
+l16.smooth1 <- wr(l16.ctilde1)
+#
+#	Same thing for the D4 wavelet (NB doesn't work in all versions
+#       of wavethresh library for some reason, so trap errors using try())
+#
+monthly.d4 <- wd(logy.padded,family="DaubExPhase",
+                 filter.number=2,bc="symmetric")
+d4.ctilde1 <- threshold(monthly.d4,levels=3:8,boundary=TRUE,type="soft",
+                         policy="universal",dev=var,by.level=TRUE)
+d4.smooth1 <- wr(d4.ctilde1)
+#
+#	And plot. NB the "Year" object contains decimal dates (created
+#	for Example 4.3). NB also different versions of wavethresh 
+#       produce different results, so this may not look the same as
+#       the one in the book :-( 
+#
+plot(Year,logy,pch=16,cex=0.5,col="grey",
+     xlab="Year",ylab=expression(log[10]*ms^-1),main="(b)")
+abline(h=mean(logy),lty=2,lwd=1)
+lines(Year,l16.smooth1[5:508])
+lines(Year,d4.smooth1[5:508],lty=2)
+legend("topleft",lty=c(1,2),cex=1.2,
+       legend=c("Least asymmetric, L=16","Extremal phase, L=4"),bty="n")
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 4.8 (PAGE 164)
+#
+#######################################################################
+write.banner("EXAMPLE 4.8 INCLUDING FIGURE 4.8 (PAGE 164)")
+
+#
+#	Start by subsampling every 10th row of the daily data,
+#	then discard any missing values
+#
+daily.data <- DeBilt.daily[seq(1,nrow(DeBilt.daily),by=10),]
+daily.data <- daily.data[!is.na(daily.data$De_Bilt),]
+#
+#	Now define covariates "Day of Year" and "decimal date" -
+#	calculations here are slightly inaccurate because they 
+#	ignore leap years, but this will have a negligible effect
+#
+cumdays <- cumsum(c(0,31,28,31,30,31,30,31,31,30,31,30))
+DayOfYear <- cumdays[daily.data$Month] + daily.data$Day
+TimeVar <- daily.data$Year + (DayOfYear/365) - (1/730)
+#
+#	Fourier covariates for seasonality
+#
+Seas.C1 <- cos(2*pi*DayOfYear / 365)
+Seas.S1 <- sin(2*pi*DayOfYear / 365)
+#
+#	Fit the quantile regression models and produce summaries.
+#       NB summary.rqss can cause problems on some systems, so
+#       give the option to skip it
+#
+y <- daily.data$De_Bilt
+daily.q05 <- rqss(y ~ Seas.C1 + Seas.S1 + qss(TimeVar,lambda=8), tau=0.05)
+daily.q95 <- rqss(y ~ Seas.C1 + Seas.S1 + qss(TimeVar,lambda=8), tau=0.95)
+cat("Quantile regression models fitted, but attempting to calculate\n")
+cat("effective degrees of freedom can cause problems on some systems.\n") 
+cat("Calculate effective degrees of freedom? (Y/N, default = Y): ")
+choice <- readLines(n=1)
+if (!(choice %in% c("n","N"))) {
+ cat("\nSUMMARY OF MODEL FOR Q05:\n")
+ cat("=========================\n")
+ cat(paste("Effective degrees of freedom for trend:",
+           round(summary(daily.q05)$qssedfs,1),"\n"))
+ cat("\nSUMMARY OF MODEL FOR Q95:\n")
+ cat("=========================\n")
+ cat(paste("Effective degrees of freedom for trend:",
+           round(summary(daily.q95)$qssedfs,1),"\n"))
+}
+#
+#	Graphics setup
+#
+par(mfrow=c(1,2),mgp=c(2.5,1,0),tcl=-0.3,mar=c(4,4,3,2),
+     cex.lab=1.2,cex.axis=1.2,cex.main=1.25,lwd=2)
+#
+#	Fig 4.8(a). Need to add the constant back to the rqss
+#	smooths for compatibility with the observations
+#
+plot(TimeVar,y,pch=15,cex=0.2,xlab="Year",ylab=expression(ms^-1),
+     ylim=c(0,15),main="(a)")
+lines(TimeVar,daily.q05$coef[1] + daily.q05$qss$TimeVar$xyz[,2],lwd=2)
+lines(TimeVar,daily.q95$coef[1] + daily.q95$qss$TimeVar$xyz[,2],lwd=2)
+plot(DayOfYear,y,pch=15,cex=0.2,xlab="Day of year",ylab=expression(ms^-1),
+     ylim=c(0,15),main="(b)")
+#
+#	Fig 4.8(b), similarly (define a new data frame with just
+#	one year's worth of seasonal cycle)
+#
+Seas.newX <- cbind(cos(2*pi*(1:365) / 365), sin(2*pi*(1:365) / 365))
+Seas.q05 <- daily.q05$coef[1] + as.numeric(Seas.newX %*% daily.q05$coef[2:3])
+lines(1:365,Seas.q05,lwd=2)
+Seas.q95 <- daily.q95$coef[1] + as.numeric(Seas.newX %*% daily.q95$coef[2:3])
+lines(1:365,Seas.q95,lwd=2)
+cat("\n----------------------------------------------------------\n")
+cat("NOTE: different versions of the quantreg library produce  \n")
+cat("      slightly different results so these plots may differ\n")
+cat("      a little from Figure 4.8 in the book.               \n")
+cat("----------------------------------------------------------\n\n")
+#
+#	Unload quantreg and SparseM packages since they mask 
+#	some other objects
+#
+detach(package:quantreg); detach(package:SparseM)
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 6.1 (PAGE 237)
+#
+#######################################################################
+write.banner("EXAMPLE 6.1 INCLUDING FIGURE 6.1 (PAGE 237)")
+
+#
+#	Use only annual data from 1961-2000 for trend estimation; 
+#	and discard any annual value derived from <335 daily 
+#	observations
+#
+wind.data <- NLwind.yearly[NLwind.yearly$Year > 1960 & 
+                           NLwind.yearly$Year < 2001,1:4]
+wind.data$Mean.wind[wind.data$N < 335] <- NA
+#
+# 	To ensure compatibility between sites, check numbers of
+# 	missing values. 
+#
+cat(paste("NUMBERS OF MISSING VALUES AT EACH SITE (OUT OF ",
+          length(unique(wind.data$Year)),"):\n\n",sep=""))
+missing.table <- tapply(is.na(wind.data$Mean.wind),
+                        INDEX=list(wind.data$Site),FUN=sum)
+names(missing.table) <- rownames(station.data)
+print(missing.table)
+#
+# 	Define a function to calculate trend slopes and apply 
+# 	to all sites
+#
+trendslope <- function(x) { coef(lm(x ~ I(1:length(x))))[2] }
+
+nl.trends <- aggregate(wind.data$Mean.wind,by=list(wind.data$Site),
+                       FUN=trendslope)
+names(nl.trends) <- c("Site","Trend")
+slopes <- 10*nl.trends$Trend
+#
+#	Reopen graphics window and set plot margins etc.
+#
+dev.off(); x11(width=11,height=8)
+par(pty="s",xaxt="n",yaxt="n",mfrow=c(1,2),mar=c(4,1,3,1))
+#
+# 	Fig 6.1(a). Circle radii are proportional to square roots
+#	of trends, so areas are proportional to trends themselves
+#
+plot(nlmap.data$LONG,nlmap.data$LAT,type="l",col=grey(0.8),xlab="",ylab="")
+symscl <- 1.25
+wanted.sites <- (slopes > 0 )
+symbols(station.data$Long[wanted.sites],station.data$Lat[wanted.sites],
+        circles=symscl*sqrt(slopes[wanted.sites]),fg=grey(0.3),
+        lwd=3,lty=1,inches=F,add=T)
+wanted.sites <- (slopes <= 0)
+#
+#	NB there is a bug (or something) in R for Windows, such that
+#	the next command does *not* produce dashed circles as requested
+#
+symbols(station.data$Long[wanted.sites],station.data$Lat[wanted.sites],
+        circles=symscl*sqrt(-slopes[wanted.sites]),lwd=3,
+        lty=2,inches=F,add=T)
+title("(a)")
+box(lwd=2)
+#
+#	Same thing again for Europe-wide wind speeds (stored in a 
+#	3D array)
+#
+eur.trends <- 10*apply(eur.wind,MARGIN=c(1,2),FUN=trendslope)
+#
+#	Fig 6.1(b)
+#
+image(x=as.numeric(rownames(eur.trends)),
+      y=as.numeric(colnames(eur.trends)),z=eur.trends,
+      col=grey(rev(40:80)/100),xlab="",ylab="",axes=FALSE,main="(b)")
+contour(x=as.numeric(rownames(eur.trends)),
+      y=as.numeric(colnames(eur.trends)),z=eur.trends,
+      levels=c(0,0.1,0.2),lwd=2,labcex=1,add=TRUE)
+contour(x=as.numeric(rownames(eur.trends)),
+      y=as.numeric(colnames(eur.trends)),z=eur.trends,
+      levels=c(-0.1,-0.2),lwd=2,lty=2,labcex=1,add=TRUE)
+box(lwd=2)
+map(add=TRUE)
+#######################################################################
+
+#######################################################################
+#
+# 	FIGURE 6.2 (PAGE 257)
+#
+#######################################################################
+write.banner("FIGURE 6.2 (PAGE 257)")
+
+#
+#	Reopen graphics window and set plot margins etc.
+#
+dev.off(); x11(width=8,height=6)
+par(mfrow=c(1,1),lwd=2,mgp=c(2.5,1,0))
+#
+# 	Extract daily data just for 1981-2000
+#
+daily.data <- DeBilt.daily[DeBilt.daily$Year >= 1981 & 
+                           DeBilt.daily$Year <= 2000,]
+#
+#	Define rescaled time in (0,1)
+#
+n <- nrow(daily.data)
+t.idx <- (1:nrow(daily.data)) / (n+1)
+#
+# 	Set up a blank co-ordinate system
+#
+plot(t.idx,daily.data$De_Bilt,type="n",xlab="Rescaled time",
+     ylab=expression(ms^-1),cex.lab=1.5,cex.axis=1.5,
+     ylim=c(0,15))
+#
+#	Compute 99th percentile of overall distribution and plot
+#	observations above and below this threshold
+#
+tau <- quantile(daily.data$De_Bilt,probs=0.99)
+abline(tau,0,lty=2)
+extreme.obs <- daily.data$De_Bilt > tau
+points(t.idx[extreme.obs],daily.data$De_Bilt[extreme.obs],pch=16)
+points(t.idx[!extreme.obs],daily.data$De_Bilt[!extreme.obs],pch=".",
+       col=grey(0.4))
+#######################################################################

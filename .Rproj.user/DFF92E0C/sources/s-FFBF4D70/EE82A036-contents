@@ -1,0 +1,387 @@
+#######################################################################
+#
+# R script for analysis of the alkalinity data from the Round Loch
+# of Glenhead, in 
+#
+# R.E. Chandler and E.M. Scott: Statistical Methods for 
+#  Trend Detection and Analysis in the Environmental Sciences.
+#  Wiley, Chichester, 2011. 
+#
+# This script contains code used for the following examples and 
+# figures in the book:
+#
+# 	Figure 1.3 					(page 11)
+#	Example 2.5 including Figure 2.5	(page 39)
+#	Example 3.7 including Figure 3.3	(page 91)
+#	Example 3.8 including Figure 3.4	(page 102)
+#
+# FILES REQUIRED:
+# ---------------
+#
+# The script requires the following files to be present in the 
+# current directory:
+#
+#	alk_data.rda
+#	trendutils.r
+#
+# LIBRARIES REQUIRED
+# ------------------
+# The script requires the following add-on R libraries to be installed:
+#
+#	lmtest
+#	nlme
+#
+#######################################################################
+#######################################################################
+#######################################################################
+
+#######################################################################
+#
+# 	DEFINE UTILITY FUNCTIONS AND LOAD REQUIRED LIBRARIES
+#
+#######################################################################
+source("trendutils.r")
+require(lmtest); require(nlme)
+
+#######################################################################
+#
+# 	FIGURE 1.3 (PAGE 11)
+#
+#######################################################################
+write.banner("FIGURE 1.3 (PAGE 11)")
+
+#
+# 	Load data. The following command loads two data frames,
+#	alk.data and alk.deseas. The second contains a subset of 
+#	the variables in the first, all deseasonalised by 
+#	subtracting the appropriate quarterly means from each 
+#	observation.
+#
+load("alk_data.rda")
+
+#
+#	Open graphics window of specified size and set plot margins etc.
+#
+x11(width=11,height=8)
+par(mfrow=c(2,2),mgp=c(2,0.75,0),tcl=-0.3,mar=c(3.5,4,3,2),
+    cex.lab=1.5,cex.axis=1.25,cex.main=1.5,lwd=2)
+#
+#	Plot (a)
+#
+plot(alk.data$Date,alk.data$Alk,pch=15,xlab="Year",
+     ylab=expression(paste(mu,"eq/l",sep="")),main="Alkalinity")
+lines(alk.data$Date,alk.data$Alk)
+abline(mean(alk.data$Alk),0,lty=2)
+#
+#	Plot (b)
+#
+plot(alk.data$Date,alk.data$Cl,pch=15,xlab="Year",
+     ylim=c(0,400),ylab=expression(paste(mu,"eq/l",sep="")),
+     main="Chemicals")
+lines(alk.data$Date,alk.data$Cl)
+abline(mean(alk.data$Cl),0,lty=2)
+lines(alk.data$Date,alk.data$xSO4,col=grey(0.4))
+points(alk.data$Date,alk.data$xSO4,pch=17,col=grey(0.4))
+abline(mean(alk.data$xSO4),0,lty=2,col=grey(0.4))
+legend(1994,400,legend=c("Chloride","Sulfate"),
+       lty=1,pch=c(15,17),col=grey(c(0,0.4)),cex=1.5)
+#
+#	Plot (c)
+#
+plot(alk.data$Date,alk.data$Qtemp,pch=15,xlab="Year",
+     ylab=expression(degree*"C"),main="Temperature")
+lines(alk.data$Date,alk.data$Qtemp)
+abline(mean(alk.data$Qtemp),0,lty=2)
+#
+#	Plot (d)
+#
+plot(alk.data$Date,alk.data$Qrain,type="b",pch=15,xlab="Year",
+     ylab="mm",main="Rainfall")
+lines(alk.data$Date,alk.data$Qrain)
+abline(mean(alk.data$Qrain),0,lty=2)
+#
+#	Uncomment the following lines to generate an appropriate 
+#	graphics output file
+#
+# dev.copy(postscript,"Fig1.3eps",width=11,height=8,onefile=TRUE)
+# dev.off()
+# dev.copy(pdf,"Fig1.3pdf",width=11,height=8)
+# dev.off()
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 2.5 (PAGE 39)
+#
+#######################################################################
+write.banner("EXAMPLE 2.5 INCLUDING FIGURE 2.5 (PAGE 39)")
+
+par(mfrow=c(2,2))
+#
+#	Plot (a)
+#
+acf(alk.deseas$Alk,main="",xlab="Lag (quarters)")
+title(main="(a)",line=1)
+#
+#	Plot (b). This is a cross-correlation between the alkalinity
+#	series and a lagged version of itself: easiest way to do this
+#	is to remove the first observation from one copy and the last
+#	observation from the other.
+#
+n <- nrow(alk.deseas)
+ccf(alk.deseas$Alk[-n],alk.deseas$Alk[-1],main="",
+                       xlab="Lag (quarters)",ylab="CCF",ylim=c(-0.5,1))
+title(main="(b)",line=1)
+#
+#	Plot (c)
+#
+ccf(alk.data$Cl,alk.deseas$Alk,main="",
+                       xlab="Lag (quarters)",ylab="CCF",ylim=c(-0.5,1))
+title(main="(c)",line=1)
+#
+#	Plot (d)
+#
+ccf(alk.data$xSO4,alk.deseas$Alk,main="",
+                       xlab="Lag (quarters)",ylab="CCF",ylim=c(-0.5,1))
+title(main="(d)",line=1)
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 3.7 (PAGE 91)
+#
+#######################################################################
+write.banner("EXAMPLE 3.7 INCLUDING FIGURE 3.3 (PAGE 91)")
+
+#
+#	Start by standardising all relevant variables; before doing 
+#	this, however, store their means and standard deviations in
+#	order that the original values can be recovered later.
+#
+varmeans <- colMeans(alk.data)
+varsds <- sd(alk.data,na.rm=TRUE)
+alk.data[,9:19] <- scale(alk.data[,9:19])
+#
+#	Baseline model with alkalinity regressed on meteorological
+#	variables only at quarterly, monthly and weekly time scales
+#	(including interactions)
+#
+base.model0 <- lm(Alk ~ Qtemp*Qrain + Mtemp*Mrain + Wtemp*Wrain,
+                  data=alk.data)
+cat("BASELINE MODEL 0:\n")
+cat("-----------------")
+print(summary(base.model0))
+#
+# 	Lots of insignificant parameters. Use step() to prune in the 
+#	first instance - it will probably give too many terms, since
+# 	it uses AIC
+#
+cat("BASELINE MODEL 1: INITIAL PRUNING:\n")
+cat("----------------------------------\n")
+cat("STEPWISE REGRESSION:\n")
+base.model1 <- step(base.model0)
+cat("\nMODEL SUMMARY:")
+print(summary(base.model1))
+#
+# 	Remove Wtemp and Wrain as well
+#
+base.model2 <- update(base.model1,. ~ . - Wtemp - Wrain - Wrain:Wtemp)
+cat("BASELINE MODEL 2: - WEEKLY PREDICTORS REMOVED:\n")
+cat("----------------------------------------------")
+print(summary(base.model2))
+#
+# 	Compare this with initial model using F test
+#
+cat("F TEST FOR INITAL AND FINAL BASELINE MODELS:\n")
+cat("--------------------------------------------\n")
+print(anova(base.model2,base.model0))
+#
+# 	Now do some diagnostics on base.model2 (not in book). Here
+#	are the standard R ones.
+#
+par(mfrow=c(2,2))
+plot(base.model2)
+#
+# 	It is also useful to look at the residual time trend, 
+#	quarterly boxplots and ACF; define a function to produce 
+#	these since we'll want to do them several times.
+#
+resiplot <- function(model,dates,quarters,varlab,modelname) {
+ plot(dates,resid(model),type="l",xlab="Year",ylab=varlab,main="(a)")
+ abline(0,0)
+ lines(dates,fitted(loess(resid(model) ~ dates)),lty=2)
+ boxplot(resid(model) ~ quarters,xlab="Quarter",ylab=varlab,main="(b)")
+ abline(0,0)
+ acf(resid(model),main="")
+ title("(c)",line=1)
+}
+#
+#	Run base.model2 through that function
+#
+cat("\nPress a key for next plots ...\n")
+readLines(n=1)
+par(mfrow=c(3,1))
+resiplot(base.model2,alk.data$Date,alk.data$Quarter,
+			expression(paste(mu,"eq/l",sep="")),
+			"baseline model")
+#
+#	Treat that as an acceptable baseline model, and add chemicals
+#	xSO4 and CL plus interactions with meteorology.
+#
+main.model0 <- update(base.model2, . ~ . + xSO4 + Cl
+                                         + Qtemp:xSO4 + Qtemp:Cl
+                                         + Mtemp:xSO4 + Mtemp:Cl
+                                         + Mrain:xSO4 + Mrain:Cl)
+cat("MAIN MODEL 0:\n")
+cat("-------------")
+print(summary(main.model0))
+#
+# Remove climatic/chemical interactions, and check using F test
+#
+main.model1 <- update(main.model0, . ~ . - Mrain:xSO4 - Mrain:Cl
+                                         - Mtemp:xSO4 - Mtemp:Cl
+                                         - Qtemp:xSO4 - Qtemp:Cl)
+cat("MAIN MODEL 1:\n")
+cat("-------------")
+print(summary(main.model1))
+cat("F TEST TO COMPARE MAIN MODELS 0 AND 1 WITH BASELINE:\n")
+cat("----------------------------------------------------\n")
+print(anova(main.model0,main.model1,base.model2))
+#
+# 	And now residuals
+#
+cat("\nPress a key for model diagnostics ...\n")
+readLines(n=1)
+par(mfrow=c(2,2))
+plot(main.model1)
+#
+#	Next plot is Figure 3.3
+#
+cat("Press a key for next plots ...\n")
+readLines(n=1)
+par(mfrow=c(3,1))
+resiplot(main.model1,alk.data$Date,alk.data$Quarter,
+			expression(paste(mu,"eq/l",sep="")),
+			"model with chemicals")
+cat("DURBIN-WATSON TEST FOR RESIDUAL AUTOCORRELATION IN MAIN MODEL 1:\n")
+print(dwtest(main.model1))
+
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 3.8 (PAGE 102)
+#
+#######################################################################
+write.banner("EXAMPLE 3.8 INCLUDING FIGURE 3.4 (PAGE 102)")
+
+#
+# 	Refit main.model1 using GLS with an AR(1) structure
+#
+gls.model1 <- gls(formula(main.model1),data=alk.data,
+	  			correlation=corAR1(),method="ML")
+cat("MAIN MODEL 1, FITTED USING GLS:\n")
+cat("-------------------------------\n")
+print(summary(gls.model1))
+#
+# 	The same thing can be done using the arima() command. Here
+#	however, the mean has to be forced to zero because it is 
+# 	incorporated into the regression part of the model via the 
+#	model matrix
+# 
+arima.model1 <- arima(alk.data$Alk,order=c(1,0,0),
+			xreg=model.matrix(main.model1),
+			include.mean=FALSE)
+cat("\nMAIN MODEL 1, FITTED USING ARIMA (AR1):\n")
+cat("---------------------------------------")
+print(arima.model1)
+#
+#	Compare models using likelihood ratio tests. It is convenient
+#	to define a function that extracts the log-likelihood of 
+#	each model along with its associated degrees of freedom
+#
+llsplit <- function(model) {
+ x <- logLik(model)
+ c(as.numeric(x),attributes(x)$df)
+}
+#
+#	Now build up a table of log-likelihoods and compare the GLS
+#	model with MainModel1
+#
+logL.table <- data.frame(rbind(llsplit(base.model2),
+				llsplit(main.model1),
+				llsplit(gls.model1),
+				llsplit(arima.model1)),
+			row.names=c("BaseModel2","MainModel1",
+				   "GLSModel1","ARIMAModel1"))
+names(logL.table) <- c("LogL","DF")
+cat("\nLOG-LIKELIHOODS FOR COMPETING MODELS:\n")
+cat("-------------------------------------\n")
+print(logL.table)
+cat(paste("\nP-value for LRT of MainModel1 vs GLSModel1:",
+          round(pchisq(2*diff(logL.table[2:3,1]),
+                       diff(logL.table[2:3,2]),lower.tail=FALSE),4),"\n"))
+#
+#	GLS residual plots (Figure 3.4). The resid() command for a gls 
+#	object returns Pearson residuals by default (i.e. normalised to 
+#	have mean 0 and variance 1, but not whitened); to get estimates 
+#	of the white noise innovations, need to specify type="normalized" 
+#	and multiply by the estimated standard deviations, hence can't 
+#	use the earlier resiplot() command :-( 
+#
+par(mfrow=c(3,1))
+e <- gls.model1$sigma*resid(gls.model1,type="normalized")
+#
+#	Plot (a)
+#
+plot(alk.data$Date,e,type="l",xlab="Year",main="(a)",
+     ylab=expression(paste(mu,"eq/l",sep="")),ylim=c(-6,10))
+abline(0,0)
+lines(alk.data$Date,fitted(loess(e ~ alk.data$Date)),lty=2)
+lines(alk.data$Date,fitted(loess(resid(base.model2) ~ alk.data$Date)),lty=3)
+legend(1995,9.5,legend=c("Final model","Baseline model"),lty=2:3,
+			title="RESIDUAL TRENDS",cex=1.4,text.width=1.6) 
+#
+#	Plot (b)
+#
+boxplot(e ~ alk.data$Quarter,xlab="Quarter",
+        ylab=expression(paste(mu,"eq/l",sep="")),main="(b)")
+abline(0,0)
+#
+#	Plot (c)
+#
+acf(e,main="")
+title("(c)",line=1)
+#
+# 	Alternative way to handle autocorrelation is to use a 
+# 	lagged response model, adding previous quarter's alkalinity
+#	as an additional covariate
+#
+main.model2 <- update(main.model1, . ~ . + Lag1)
+cat("\nLAGGED RESPONSE MODEL:\n")
+cat("----------------------\n")
+print(summary(main.model2))
+#
+#	Compare this model with the initial models that did not
+#	account for autocorrelation. NB however: these models
+#	must be refitted after discarding the first observation 
+#	for this test, since formal comparisons must be made
+#	on the same set of data and the first observation cannot
+#	be used in the fitting of the lagged response model
+#
+base.model2a <- update(base.model2,subset=-1)
+main.model1a <- update(main.model1,subset=-1)
+cat("ANOVA TABLE FOR COMPETING MODELS:\n")
+cat("---------------------------------\n")
+print(anova(base.model2a,main.model1a,main.model2))
+#
+#	To compare the GLS and lagged response models we can use AIC
+#	providing the GLS model is also refitted after omitting the 
+#	first observation
+#
+gls.model1a <- update(gls.model1,subset=-1)
+cat("\nLAGGED RESPONSE VS GLS FITS:\n")
+cat("----------------------------\n")
+AIC.table <- data.frame(AIC=c(AIC(main.model2),AIC(gls.model1a)),
+			row.names=c("MainModel2","GLSModel1"))
+print(AIC.table)

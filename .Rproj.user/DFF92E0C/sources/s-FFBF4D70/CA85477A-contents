@@ -1,0 +1,39 @@
+## Construct Data for analysis
+
+
+BST.mon.data<- data.frame(Year = BST.an.mon.freq$Year,
+                          Month = BST.an.mon.freq$Month,
+                          TC.freq = BST.an.mon.freq$freq,
+                          TS.freq = BST.mon.TS$freq,
+                          TY.freq = BST.mon.TY$freq,
+                          SuperTY.freq = BST.mon.SuperTY$freq)
+str(BST.mon.data)
+
+BST.mon.data$Month<- as.integer(BST.mon.data$Month)
+
+str(BST.mon.data)
+str(SST)
+Nino<- data.frame(Year = SST$YR,
+                  Month = SST$MON,
+                  NINO3 = SST$NINO3,
+                  ANOM3 = SST$ANOM.1,
+                  NINO3.4 = SST$NINO3.4,
+                  ANOM3.4 = SST$ANOM.3,
+                  NINO4 = SST$NINO4,
+                  ANOM4 = SST$ANOM.2)
+BST.ana<- merge(Nino, BST.mon.data, sort = FALSE)
+str(BST.ana)
+
+
+write.table(BST.ana, "BST_analysis_data.dat", row.names = FALSE)
+
+
+## Plotting
+## Tropical Storm
+par(mfrow=c(2,1))
+plot(BST.ana$NINO3.4,BST.ana$TS.freq, xlab = "Monthly SST in region NINO3.4",
+     ylab = "Numer of Tropical Storms +", main = "Original Scales")
+plot(BST.ana$NINO3.4,BST.ana$TS.freq, xlab = "Monthly SST in region NINO3.4",
+     ylab = "Numer of Tropical Storms +", log = "xy",main = "Logarithmic Scales")
+
+

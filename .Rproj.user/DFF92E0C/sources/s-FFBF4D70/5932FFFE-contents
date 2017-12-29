@@ -1,0 +1,458 @@
+#######################################################################
+#
+# R script for miscellanous examples and figures in Part 1 of
+#
+# R.E. Chandler and E.M. Scott: Statistical Methods for 
+#  Trend Detection and Analysis in the Environmental Sciences.
+#  Wiley, Chichester, 2011. 
+#
+# This script contains code used for the following examples and 
+# figures in the book:
+#
+#	Example 2.7 including Figure 2.10	(page 49)
+#	Figure 4.6					(page 156)
+#	Example 5.1 including Figures 5.1/2	(pages 172/176)
+#	Figures 5.5 and 5.7			(pages 193/200)
+#	Example 5.8 including Figure 5.8	(pages 202-3)
+#
+# The following examples and figures are *not* included in this 
+# script:
+#
+#	Example 3.6 / Figure 3.2 (code is in file haddock.r)
+#	Example 6.1 / Figure 6.1 (code is in file nlwind.r)
+#
+# FILES REQUIRED:
+# ---------------
+#
+# The script requires the following files to be present in the 
+# current directory:
+#
+#	eaj.dat
+#	trendutils.r 
+#
+# LIBRARIES REQUIRED
+# ------------------
+# The script requires the following add-on R libraries to be installed:
+#
+#	fracdiff
+#	longmemo
+#	wavethresh
+#
+#######################################################################
+#######################################################################
+#######################################################################
+
+#######################################################################
+#
+# 	DEFINE UTILITY FUNCTIONS AND LOAD REQUIRED LIBRARIES
+#
+#######################################################################
+source("trendutils.r")
+require(fracdiff); require(longmemo); require(wavethresh)
+
+#######################################################################
+#
+# 	EXAMPLE 2.7 (PAGE 49)
+#
+#######################################################################
+write.banner("EXAMPLE 2.7 INCLUDING FIGURE 2.10 (PAGE 49)")
+
+#
+# 	Define filters used in Example 2.6, along with a 61-point 
+#	filter designed to kill anything below 2 years (i.e. 24 
+#	months, since the data in that example are monthly)
+#
+w1 <- rep(1,61); w1 <- w1 / sum(w1)
+w2 <- rep(1,15); w2 <- w2 / sum(w2)
+w3 <- polyfil(7,3)
+maxfreq <- 1/24
+w4 <- filter.design(k=30,freq=maxfreq)
+#
+# Calculate squared gains for all filters
+#
+H1 <- filter.gain(w1,nfreqs=500)
+H2 <- filter.gain(w2,nfreqs=500)
+H3 <- filter.gain(w3,nfreqs=500)
+H4 <- filter.gain(w4,nfreqs=500)
+#
+#	For filters H1 and H4, retain only low-frequency components
+#	so as to zoom in for Fig 2.10(b)
+#
+lowfreqs <- H1[,1] <= 0.25
+H1 <- H1[lowfreqs,]
+H4 <- H4[lowfreqs,]
+#
+# 	Open graphics window and set up margins etc.
+#
+x11(width=10,height=7)
+par(mfrow=c(1,2),mgp=c(2.5,1,0),tcl=-0.3,mar=c(3.5,4,3,2),
+    cex.lab=1.5,cex.axis=1.25,cex.main=1.5,lwd=3)
+#
+#	Fig 2.10(a) [but ensure a common vertical scale]
+#
+ylim <- range(H4[,3])
+plot(H2[,1],H2[,3],xlab="Frequency (cycles / unit time)",
+		ylab="Squared gain",type="l",ylim=ylim,main="(a)")
+lines(H3[,1],H3[,3],lty=2)
+legend(0.1,0.7,legend=c("15-point moving average",
+                        "15-point cubic polynomial"),
+		lty=c(1,2),cex=1.1)
+#
+#	Fig 2.10(b)
+#
+plot(c(0,maxfreq,maxfreq,0.25),c(1,1,0,0),type="l",col=grey(0.6),
+		xlab="Frequency (cycles / unit time)",
+		ylab="Squared gain",ylim=ylim,main="(b)")
+lines(H1[,1],H1[,3]); lines(H4[,1],H4[,3],lty=2)
+legend(0.055,0.7,legend=c("61-point moving average",
+                        "61-point low pass","Ideal low pass"),
+		lty=c(1,2,1),col=c(1,1,grey(0.6)),cex=1.1)
+#######################################################################
+
+#######################################################################
+#
+# 	FIGURE 4.6 (PAGE 156)
+#
+#######################################################################
+write.banner("FIGURE 4.6 (PAGE 156)")
+
+#
+#	Reopen graphics window at a different size, and set plot
+#	margins etc.
+#
+dev.off(); x11(width=8,height=6)
+par(mfrow=c(1,1),mgp=c(2.5,1,0),tcl=-0.3,mar=c(4,4,3,2),
+     cex.lab=1.2,cex.axis=1.2,cex.main=1.25,lwd=2)
+#
+# Now draw some wavelets and corresponding squared gains. It isn't easy to
+# get at the wavelets themselves from the routines in either the wavethresh,
+# waveslim or wavelets libraries (wavethresh will plot them, but only
+# one at a time). The trick therefore is to create a dummy list of wavelet
+# coefficients that are all zero except for a single strategically-placed
+# 1; then do the inverse DWT. NB the argument "filter.number" refers to 
+# *half* the length of the wavelet filter (this can be checked using, 
+# e.g., length(filter.select(4))). Thus, to get the filter usually
+# known as D(4), specify filter.number=2 (the default) and so on. 
+#
+n <- 2048
+y <- rep(0,n)
+x <- (1:n) / n
+ycoef <- wd(y,family="DaubExPhase")
+ycoef$D <- rep(0,length(ycoef$D))
+#
+#	Here is the dummy list
+#
+ycoef <- putD(ycoef,3,c(0,0,0,1,0,0,0,0))
+xlim <- c(0.05,0.9)
+#
+#	Set up a blank plot and shade the nominal support of the wavelets
+#
+plot(x,wr(ycoef,filter.number=2,family="DaubExPhase"),
+     type="n",axes=FALSE,xlab="",ylab="",main="",xlim=xlim)
+rect(3/8,-10,1/2,10,col="lightgrey",border=NA)
+#
+#	Add the D4 wavelet
+#
+lines(x,wr(ycoef,filter.number=2,family="DaubExPhase"),lty=2)
+#
+#	And the D16 
+#
+lines(x,wr(ycoef,filter.number=8,family="DaubLeAsymm"))
+axis(side=2,at=0,las=2)
+abline(0,0,lwd=1)
+text(x=0.9,y=-0.01,labels=expression(x),cex=1.5)
+abline(v=xlim[1],lwd=1)
+legend(x=0.55,y=0.12,lty=c(2,1),cex=1.2,
+       legend=c("Extremal phase, L=4","Least asymmetric, L=16"),bty="n")
+mtext(expression(psi(x)),side=3,at=0,cex=1.5)
+#######################################################################
+
+#######################################################################
+#
+# 	FIGURE 5.1 (PAGE 172)
+#
+#######################################################################
+write.banner("FIGURE 5.1 (PAGE 172)")
+
+#
+#	Graphics settings
+#
+par(mfrow=c(1,1),lwd=3,mar=c(6,6,4,4))
+#
+#	Set random number seed so that simulation results 
+#	are reproducible; and simulate two series from 
+#	equation (5.1) in book
+#
+set.seed(2000)
+ar2.coef <- c(0.99587363,-0.58363592)
+y1 <- arima.sim(list(ar=ar2.coef),n=40)
+y2 <- arima.sim(list(ar=ar2.coef),n=40)
+#
+#	Here's the figure
+#
+plot(y1,type="l",xlab="t",ylab=expression(Y[t]),
+	cex.axis=1.5,cex.lab=2,ylim=range(c(y1,y2)))
+lines(y2,lty=2,col=grey(0.4))
+#######################################################################
+
+#######################################################################
+#
+# 	EXAMPLE 5.1 (PAGE 176)
+#
+#######################################################################
+write.banner("EXAMPLE 5.1 INCLUDING FIGURE 5.2 (PAGE 176)")
+
+#
+#	Graphics settings
+#
+par(mfrow=c(3,2),mgp=c(2,0.75,0),tcl=-0.3,mar=c(3.5,4,3,2),
+    cex.lab=1.5,cex.axis=1.25,cex.main=1.5,lwd=2)
+#
+#	AR(1) simulation:
+#
+y.ar1 <- arima.sim(list(ar=0.7),n=40)
+#
+#	Sample ACF
+#
+acf(y.ar1,main="",lag.max=12,ylim=c(-0.7,1))
+#
+#	Theoretical ACF
+#
+points(0:12,ARMAacf(ar=0.7,lag.max=12),pch=15,cex=1.5)
+title(expression(paste("ACF:",Y[t]==0.7*Y[t-1]+epsilon[t]),cex=1.5))
+#
+#	Sample and theoretical PACF
+#
+pacf(y.ar1,main="",lag.max=12,ylim=c(-0.7,1))
+points(1:12,ARMAacf(ar=0.7,lag.max=12,pacf=TRUE),pch=15,cex=1.5)
+title(expression(paste("PACF:",Y[t]==0.7*Y[t-1]+epsilon[t]),cex=1.5))
+#
+#	Ditto, AR(2) (this series was already generated for 
+#	Figure 5.1)
+#
+acf(y1,main="",lag.max=12,ylim=c(-0.7,1))
+points(0:12,ARMAacf(ar=ar2.coef,lag.max=12),pch=15,cex=1.5)
+title(expression(paste("ACF:",Y[t]==0.9959*Y[t-1]-0.5836*Y[t-2]+epsilon[t]),
+      cex=1.5))
+pacf(y1,main="",lag.max=12,ylim=c(-0.7,1))
+points(1:12,ARMAacf(ar=ar2.coef,lag.max=12,pacf=TRUE),pch=15,cex=1.5)
+title(expression(paste("PACF:",Y[t]==0.9959*Y[t-1]-0.5836*Y[t-2]+epsilon[t]),
+      cex=1.5))
+#
+#	And ARMA(1,1)
+#
+y.arma <- arima.sim(list(ar=0.8,ma=-0.4),n=40)
+acf(y.arma,main="",lag.max=12,ylim=c(-0.7,1))
+points(0:12,ARMAacf(ar=0.8,ma=-0.4,lag.max=12),pch=15,cex=1.5)
+title(expression(paste("ACF:",Y[t]==0.8*Y[t-1]+epsilon[t]-0.4*epsilon[t-1]),
+      cex=1.5))
+pacf(y.arma,main="",lag.max=12,ylim=c(-0.7,1))
+points(1:12,ARMAacf(ar=0.8,ma=-0.4,lag.max=12,pacf=TRUE),pch=15,cex=1.5)
+title(expression(paste("PACF:",Y[t]==0.8*Y[t-1]+epsilon[t]-0.4*epsilon[t-1]),
+      cex=1.5))
+#######################################################################
+
+#######################################################################
+#
+# 	FIGURE 5.5 (PAGE 193)
+#
+#######################################################################
+write.banner("FIGURE 5.5 (PAGE 193)")
+
+#
+#	Graphics settings
+#
+par(mfrow=c(2,1),mgp=c(2,0.75,0),tcl=-0.3,mar=c(3.5,4,3,2),
+    cex.lab=1.5,cex.axis=1.2,cex.main=1.5,lwd=2)
+#
+#	Generate a white noise sequence of length 250, and storage 
+#	for three series
+#
+T <- 250
+delta <- rnorm(T)
+y <- matrix(nrow=T,ncol=3)
+#
+#	Three values of phi, and initialise each series with the 
+#	first value in delta
+#
+phi <- c(0.95,1,1.05)
+y[1,] <- delta[1]
+#
+#	Loop through time points, generating the process as
+#	we go (NB this generates all three series simultaneously)
+#
+for (i in 2:T) {
+ y[i,] <- phi*y[i-1,] + delta[i]
+}
+#
+#	Plot the stationary series and the random walk ...
+#
+plot(y[,1],type="l",xlab="t",ylab=expression(Y[t]),col=grey(0.4),
+	ylim=range(as.vector(y[,1:2])),main="(a)",lty=2)
+lines(y[,2])
+legend(0,22,lty=c(2,1),lwd=2,col=c(grey(0.4),1),
+                   legend=c(expression(phi == 0.95),
+                            expression(phi == 1)),
+       cex=1.5)
+abline(0,0,lty=3)
+#
+#	... and the explosive series
+#
+plot(y[,3],type="l",xlab="t",ylab=expression(Y[t]),main="(b)")
+#######################################################################
+
+#######################################################################
+#
+# 	FIGURE 5.7 (PAGE 200)
+#
+#######################################################################
+write.banner("FIGURE 5.7 (PAGE 200)")
+
+#
+#	Spurious regressions, with previously generated random walk 
+#	for the response, and a new (independent) one for the covariate
+#
+y <- y[,2]
+x <- cumsum(rnorm(T))
+#
+#	Fig 5.7(a)
+#
+plot(y,type="l",xlab="t",ylab="",col=grey(0.4),
+	   ylim=range(c(x,y)),main="(a)",lty=2)
+lines(x)
+legend(0,24,lty=c(2,1),lwd=2,col=c(grey(0.4),1),
+                   legend=c(expression(Y[t]),
+                            expression(X[t])),
+		   cex=1.5)
+#
+#	Carry out the regression and output
+#
+cat("REGRESSION OF Y[t] UPON X[t]:\n")
+spurious.lm1 <- lm(y ~ x)
+print(summary(spurious.lm1))
+#
+#	Fig 5.7(b)
+#
+plot(resid(spurious.lm1), type="l",xlab="t",ylab="Residual",main="(b)")
+abline(0,0,lty=2)
+#
+#	A lagged response model is also incorrect (although it gives
+#	the right answer in this case)
+#
+cat("REGRESSION OF Y[t] UPON Y[t-1] and X[t]:\n")
+spurious.frame <- data.frame(Y=y[-1],Y.lag1=y[-T],X=x[-1])
+spurious.lm2 <- lm(Y ~ Y.lag1 + X, data=spurious.frame)
+print(summary(spurious.lm2))
+#
+#	The right thing to do is to regress the differenced series 
+#	upon each other
+#
+cat("REGRESSION OF DIFFERENCES:\n")
+diff.lm <- lm(diff(y) ~ diff(x))
+print(summary(diff.lm))
+#######################################################################
+
+#######################################################################
+#
+# 	FIGURE 5.8 (PAGE 202)
+#
+#######################################################################
+write.banner("EXAMPLE 5.8 INCLUDING FIGURE 5.8 (PAGE 202)")
+
+#
+# 	Read the data and set plot margins etc.
+#
+eaj.data <- read.table("eaj.dat",header=TRUE)
+par(mfrow=c(2,2),lwd=2,mar=c(5,4,4,2))
+#
+#	Fig 5.8(a)
+#
+plot(eaj.data$Year,eaj.data$EAJ,type="l",xlab="Year",ylab="Index value",
+     main="(a)")
+abline(0,0)
+#
+#	Fig 5.8(b)
+#
+acf(eaj.data$EAJ,xlab="Lag (years)",main="(b)",lag.max=12)
+#
+# 	Fit ARFIMA(0,d,0) model using routine from fracdiff
+#	library, and superimpose theoretical ACF for the 
+# 	fitted model onto the plot. 
+#
+eaj.model <- fracdiff(eaj.data$EAJ)
+cat("\nSUMMARY OF EAJ MODEL:\n")
+print(summary(eaj.model))
+points(0:12,fracdiff.acf(eaj.model$d,lag.max=12),pch=15,cex=1.5)
+#
+# 	Check the fit using the slow and exact routine provided
+#	in file trendutils.r - enforce zero mean, because the
+#	index is some kind of anomaly
+#
+eaj.model2 <- fracdiff.slowfit(eaj.data$EAJ,mu=0)
+cat("\nSUMMARY OF EXACT FIT:\n\n")
+print(eaj.model2$Fit)
+cat(paste("\nLog-likelihood:",round(eaj.model2$LogL,3),
+          "\tAIC:",round(eaj.model2$AIC,3),"\n\n"))
+#
+# 	Also fit using FEXPest routine from Beran's longmemo library
+#	(not reported in book)
+#
+cat("SUMMARY OF FIT USING BERAN'S FEXP ESTIMATOR:\n\n")
+print(FEXPest(eaj.data$EAJ,order.poly=0,pvalmax=1))
+#
+# 	Simulate from fitted model, using repeatable random
+#	number seed and scaling to match observed standard
+#	deviation
+#
+set.seed(3456)
+simdata <- fracdiff.sim(n=41,d=eaj.model$d)
+simdata <- simdata$series * sqrt(var(eaj.data$EAJ)/var(simdata$series))
+#
+#	Fig 5.8(c)
+#
+plot(simdata[1:41],type="l",xlab="Time",ylab="Value",main="(c)")
+abline(0,0)
+#
+# 	Calculate predictions from fitted model. NB the fracdiff 
+# 	command doesn't give an estimate of the error variance, so 
+# 	do this with a moment estimator as in Haslett and Raftery 
+#	(1989) - this in turn is based on the standardised
+#	innovations
+#
+eaj.decomp <- fracdiff.decomp(eaj.data$EAJ,d=eaj.model$d)
+eaj.resid <- eaj.decomp$Innov / sqrt(eaj.decomp$Var.innov)
+eaj.sigma <- sqrt(mean(eaj.resid^2))
+eaj.predict.longmem <- fracdiff.decomp(eaj.data$EAJ,d=eaj.model$d,
+                                       n.ahead=30,
+                                       sigma=eaj.sigma)
+longmem.pred <- eaj.predict.longmem$Predict[42:71]
+longmem.pse <- sqrt(eaj.predict.longmem$Var.innov[42:71])
+longmem.lo <- longmem.pred-(1.96*longmem.pse)
+longmem.hi <- longmem.pred+(1.96*longmem.pse)
+#
+#	Fig 5.8(d)
+#
+pred.years <- 1:nrow(eaj.predict.longmem) + min(eaj.data$Year) - 1
+plot(pred.years[-(1:20)],eaj.predict.longmem$Obs[-(1:20)],
+     type="l",xlab="Year",ylab="Index value",main="(d)",
+     ylim=range(c(longmem.lo,longmem.hi)))
+abline(0,0)
+lines(pred.years[-(1:41)],longmem.pred,lty=2)
+lines(pred.years[-(1:41)],longmem.lo,lty=3)
+lines(pred.years[-(1:41)],longmem.hi,lty=3)
+#
+# 	Diagnostics (not in book): plot innovations from fitted model, 
+#	and their sample ACF, using exact calculations from 
+#	routines in trendutils.r. Could also use the diffseries command 
+# 	from the fracdiff library, which isn't exact but actually is very 
+# 	close - compare results below with those from 
+# 	"diffseries(eaj.data$EAJ,eaj.model$d)"
+#
+cat("\nPress a key to view diagnostic plots ...\n")
+readLines(n=1)
+par(mfrow=c(1,2))
+plot(eaj.data$Year,eaj.resid,type="l",xlab="Year",
+     ylab="Residual",main="Standardised innovations")
+abline(0,0)
+acf(eaj.resid,xlab="Lag (years)",main="Residual ACF",lag.max=12)
+#######################################################################

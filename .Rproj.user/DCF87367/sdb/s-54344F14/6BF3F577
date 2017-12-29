@@ -1,0 +1,29 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1510091331360.000,
+    "dirty" : false,
+    "encoding" : "",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "6BF3F577",
+    "lastKnownWriteTime" : 7957699051639942772,
+    "last_content_update" : 1510091331360,
+    "path" : null,
+    "project_path" : null,
+    "properties" : {
+        "cacheKey" : "C8EFE2F2",
+        "caption" : "SST",
+        "contentUrl" : "grid_resource/gridviewer.html?env=&obj=SST&cache_key=C8EFE2F2",
+        "displayedObservations" : 429,
+        "environment" : "",
+        "object" : "SST",
+        "preview" : 0,
+        "totalObservations" : 429,
+        "variables" : 10
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_dataframe"
+}
