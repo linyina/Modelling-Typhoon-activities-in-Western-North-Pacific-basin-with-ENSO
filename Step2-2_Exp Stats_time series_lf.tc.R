@@ -304,12 +304,11 @@ plot(density(BST.an.SuperTY$x),
 dev.copy(pdf,"Kernel Distribution of annual TC in NWP.pdf",width=8,height=6)
 dev.off()
 ## b.3 ACF PACF
-par(mfrow=c(2,2))
-acf(BST.annual$Frequency,lag.max=20)  # Strong lag
-acf(BST.an.TS$x, lag.max = 20)
-acf(BST.an.TY$x,lag.max=20)
-acf(BST.an.SuperTY$x,lag.max=20)
-dev.copy(pdf,"NWP_ACF.pdf",width=8,height=6)
+par(mfrow=c(1,3))
+acf(BST.an.TS$x, lag.max = 20, main="Autocorrelation for annual number of TS+", xlab="Lag(year)")
+acf(BST.an.TY$x,lag.max=20,main="Autocorrelation for annual number of TY+", xlab="Lag(year)")
+acf(BST.an.SuperTY$x,lag.max=20, main="Autocorrelation for annual number of SuperTY+", xlab="Lag(year)")
+dev.copy(pdf,"NWP_ACF.pdf",width=12,height=4)
 dev.off()
 par(mfrow=c(1,1))
 ## b.4 Time Series Plot
@@ -339,13 +338,13 @@ dev.off()
 plot.new()
 xyplot(BST.mon.TS$freq ~ BST.mon.TS$Year | as.factor(BST.mon.TS$Month), 
        type="l",xlab="Year",ylab="Total times of Tropical Storms",
-       main="Annual Frequency of TS for different months")
+       main="Annual Frequency of TS+ for different months")
 dev.copy(pdf,"Frequency of TS_months.pdf",width=8,height=6)
 dev.off()
 plot.new()
 xyplot(BST.mon.TY$freq ~ BST.mon.TY$Year | as.factor(BST.mon.TY$Month), 
        type="l",xlab="Year",ylab="Total times of Typhoons",
-       main="Annual Frequency of TY for different months")
+       main="Annual Frequency of TY+ for different months")
 dev.copy(pdf,"Frequency of TY_months.pdf",width=8,height=6)
 dev.off()
 plot.new()
@@ -398,10 +397,10 @@ dev.off()
 ## TS+
 BST.mon.TS$od.year<-reorder(BST.mon.TS$Year, BST.mon.TS$freq)
 plot.new()
-p5 <-  ggplot(data=BST.mon.TS, aes(od.year, Month)) + 
+p5 <-  ggplot(data=BST.mon.TS, aes(Year, Month)) + 
   geom_tile(aes(fill = freq), colour = "white") +
   scale_fill_gradient(low = "#FFFF80CC",high = "#FF0000CC")+
-  labs(x = "Year",y = "Month", title = "Annual Frequency of Tropical Storms in 1949-2016")
+  labs(x = "Year",y = "Month", title = "Annual Frequency of Tropical Storms+ in 1949-2016")
 
 p5 + theme(plot.title = element_text(size = rel(1.2))) + theme(axis.text.x = element_text(angle = 90,hjust = 1, colour = "grey50"))
 dev.copy(pdf,"Heatmap_TS_total_Year.pdf",width=8,height=6)
@@ -410,10 +409,10 @@ dev.off()
 ## TY+
 BST.mon.TY$od.year<-reorder(BST.mon.TY$Year, BST.mon.TY$freq)
 plot.new()
-p6 <-  ggplot(data=BST.mon.TY, aes(od.year, Month)) + 
+p6 <-  ggplot(data=BST.mon.TY, aes(Year, Month)) + 
   geom_tile(aes(fill = freq), colour = "white") +
   scale_fill_gradient(low = "#FFFF80CC",high = "#FF0000CC")+
-  labs(x = "Year",y = "Month", title = "Annual Frequency of Typhoons in 1949-2016")
+  labs(x = "Year",y = "Month", title = "Annual Frequency of Typhoons+ in 1949-2016")
 
 p6 + theme(plot.title = element_text(size = rel(1.2))) + theme(axis.text.x = element_text(angle = 90,hjust = 1, colour = "grey50"))
 dev.copy(pdf,"Heatmap_TY_total_Year.pdf",width=8,height=6)
@@ -422,10 +421,10 @@ dev.off()
 ## SuperTY
 BST.mon.SuperTY$od.year<-reorder(BST.mon.SuperTY$Year, BST.mon.SuperTY$freq)
 plot.new()
-p7 <-  ggplot(data=BST.mon.SuperTY, aes(od.year, Month)) + 
+p7 <-  ggplot(data=BST.mon.SuperTY, aes(Year, Month)) + 
   geom_tile(aes(fill = freq), colour = "white") +
   scale_fill_gradient(low = "#FFFF80CC",high = "#FF0000CC")+
-  labs(x = "Year",y = "Month", title = "Annual Frequency of SuperTY in 1949-2016")
+  labs(x = "Year",y = "Month", title = "Annual Frequency of SuperTY+ in 1949-2016")
 
 p7 + theme(plot.title = element_text(size = rel(1.2))) + theme(axis.text.x = element_text(angle = 90,hjust = 1, colour = "grey50"))
 dev.copy(pdf,"Heatmap_SuperTY_total_Year.pdf",width=8,height=6)

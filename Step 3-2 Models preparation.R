@@ -12,7 +12,7 @@ str(SST)
 Nino<- data.frame(Year = SST$YR,
                   Month = SST$MON,
                   NINO3.4 = SST$NINO3.4,
-                  ANOM3.4 = SST$ANOM.3)
+                  TNI = SST$TNI)
 BST.ana<- merge(Nino, BST.mon.data, sort = FALSE)
 str(BST.ana)
 
@@ -28,4 +28,5 @@ plot(BST.ana$NINO3.4,BST.ana$TS.freq, xlab = "Monthly SST in region NINO3.4",
 plot(BST.ana$NINO3.4,BST.ana$TS.freq, xlab = "Monthly SST in region NINO3.4",
      ylab = "Numer of Tropical Storms +", log = "xy",main = "Logarithmic Scales")
 
+plot.ts(SST$NINO3.4)
 

@@ -1,6 +1,7 @@
 ## Part 2: CMABST Data
 ## 1. Reconstructing Data
 BST.clean<- CMABST
+#BST.clean<- new.data
 BST.clean[BST.clean$Intensity==9,]$Intensity <- 0
 BST.temp <- data.frame(Year=rep(1949:2016, each=12), 
                        Month= rep(c(1:12), 68))
